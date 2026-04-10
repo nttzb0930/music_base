@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
 import coil.compose.AsyncImage
 import com.example.music_base.ui.viewmodel.AuthState
 import com.example.music_base.ui.viewmodel.AuthViewModel
@@ -205,7 +206,7 @@ fun GuestProfileSection(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
                 "Sign in to save your library and sync across devices.",
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = 14.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp)
             )
         }

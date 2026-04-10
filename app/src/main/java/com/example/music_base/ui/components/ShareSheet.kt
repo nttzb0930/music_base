@@ -38,7 +38,7 @@ import com.example.music_base.ui.theme.*
 private val ShareColorOptions = listOf(
     ShareMint,
     ShareGreyGreen,
-    com.example.music_base.ui.theme.Primary, // Using the main theme green as Spotify Green alternative
+    Primary, // Using the main theme green as Spotify Green alternative
     ShareDeepPurple,
     ShareRoyalBlue,
     ShareOrange,

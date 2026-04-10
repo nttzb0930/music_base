@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
 import com.example.music_base.ui.viewmodel.AuthState
 import com.example.music_base.ui.viewmodel.AuthViewModel
 import com.example.music_base.ui.components.SocialLoginButton
@@ -471,13 +472,14 @@ fun RegisterScreen(
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    letterSpacing = 2.sp
+                    letterSpacing = 2.sp,
+                    textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Welcome to Sonic Gallery. Redirecting you to login screen...",
                     color = Color.White.copy(alpha = 0.7f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    textAlign = TextAlign.Center,
                     fontSize = 14.sp
                 )
                 Spacer(modifier = Modifier.height(32.dp))

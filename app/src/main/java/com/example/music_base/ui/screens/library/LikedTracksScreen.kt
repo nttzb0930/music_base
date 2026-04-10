@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -216,12 +217,12 @@ fun LikedTracksScreen(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(
+                            textStyle = TextStyle(
                                 color = Color.White,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium
                             ),
-                            cursorBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFF1DB954)),
+                            cursorBrush = SolidColor(Color(0xFF1DB954)),
                             decorationBox = { innerTextField ->
                                 Box(contentAlignment = Alignment.CenterStart) {
                                     if (searchQuery.isEmpty()) {
