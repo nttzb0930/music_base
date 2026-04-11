@@ -25,6 +25,11 @@
             android:name=".data.player.MusicActionReceiver"
             android:exported="false" />
 
+        <service 
+            android:name=".data.player.MusicService"
+            android:exported="false"
+            android:stopWithTask="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -270,6 +270,7 @@ fun SimpleActionItem(
             color = Color.White.copy(alpha = 0.9f),
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )

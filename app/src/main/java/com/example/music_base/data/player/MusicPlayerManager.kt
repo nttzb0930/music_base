@@ -1,6 +1,7 @@
 package com.example.music_base.data.player
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
@@ -52,6 +53,14 @@ object MusicPlayerManager {
         this.context = context.applicationContext
         setupMediaSession(this.context!!)
         notificationManager = MusicNotificationManager(this.context!!)
+        
+        // Start the service to detect task removal
+        try {
+            val intent = Intent(this.context, MusicService::class.java)
+            this.context?.startService(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun setupMediaSession(context: Context) {
