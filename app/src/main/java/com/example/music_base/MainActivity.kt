@@ -58,6 +58,8 @@ import com.example.music_base.ui.screens.library.LibraryScreen
 import com.example.music_base.ui.screens.library.LikedTracksScreen
 import com.example.music_base.ui.components.SonicToast
 import com.example.music_base.ui.components.ToastType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import com.example.music_base.ui.screens.admin.AdminDashboardScreen
 import com.example.music_base.ui.screens.admin.*
 
@@ -597,6 +599,7 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                 val likedTrackIds by musicViewModel.likedTrackIds.collectAsState()
 
                 ShowAllScreen(
+                    modifier = Modifier.pointerInput(Unit) { },
                     type = type,
                     tracks = tracksToList,
                     albums = albumsToList,
@@ -672,6 +675,7 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                 val albumDetail by musicViewModel.albumDetail.collectAsState()
                 val isDetailLoading by musicViewModel.isDetailLoading.collectAsState()
                 AlbumDetailScreen(
+                    modifier = Modifier.pointerInput(Unit) { },
                     album = album,
                     albumDetail = albumDetail,
                     currentPlayingTrack = currentTrack,
@@ -733,6 +737,7 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                 val isLoading by musicViewModel.isArtistDetailLoading.collectAsState()
                 val followedIds by musicViewModel.followedArtistIds.collectAsState()
                 ArtistDetailScreen(
+                    modifier = Modifier.pointerInput(Unit) { },
                     artist = artist,
                     tracks = tracks,
                     currentPlayingTrack = currentTrack,
@@ -792,6 +797,7 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
         ) {
             openedPlaylist?.let { playlist ->
                 PlaylistDetailScreen(
+                    modifier = Modifier.pointerInput(Unit) { },
                     viewModel = musicViewModel,
                     playlist = playlist,
                     playlistDetail = currentPlaylistDetail,
@@ -856,6 +862,7 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
             exit = slideOutVertically { it } + fadeOut()
         ) {
             LikedTracksScreen(
+                modifier = Modifier.pointerInput(Unit) { },
                 viewModel = musicViewModel,
                 currentPlayingTrack = currentTrack,
                 onBackClick = { showLikedTracks = false },
@@ -907,6 +914,7 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
             exit = slideOutHorizontally { it } + fadeOut()
         ) {
             SettingsScreen(
+                modifier = Modifier.pointerInput(Unit) { },
                 onBackClick = { showSettings = false },
                 viewModel = authViewModel,
                 onNavigateToLogin = {

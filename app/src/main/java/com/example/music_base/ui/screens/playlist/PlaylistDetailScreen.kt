@@ -59,8 +59,8 @@ fun PlaylistDetailScreen(
     onAddToPlaylist: (Track) -> Unit = {},
     onShare: (Track) -> Unit = {},
     isShuffleEnabled: Boolean = false,
-    onToggleShuffle: () -> Unit = {}
-
+    onToggleShuffle: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     var showEditDialog by remember { mutableStateOf(false) }
     var trackForMenu by remember { mutableStateOf<Track?>(null) }
@@ -91,6 +91,7 @@ fun PlaylistDetailScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val detailError by viewModel.playlistDetailError.collectAsState()
 
+    Box(modifier = modifier) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -519,6 +520,7 @@ fun PlaylistDetailScreen(
             )
         }
     }
+}
 }
 
 

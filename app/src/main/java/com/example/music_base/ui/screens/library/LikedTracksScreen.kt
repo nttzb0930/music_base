@@ -56,7 +56,8 @@ fun LikedTracksScreen(
     isShuffleEnabled: Boolean = false,
     onToggleShuffle: () -> Unit = {},
     onAddToPlaylist: (Track) -> Unit = {},
-    onShare: (Track) -> Unit = {}
+    onShare: (Track) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
 
     val likedTracks by viewModel.likedTracks.collectAsState()
@@ -102,6 +103,7 @@ fun LikedTracksScreen(
     }
 
 
+    Box(modifier = modifier) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -447,4 +449,5 @@ fun LikedTracksScreen(
 
         }
     }
+}
 }

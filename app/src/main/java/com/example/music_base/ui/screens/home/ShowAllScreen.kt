@@ -65,7 +65,8 @@ fun ShowAllScreen(
     onAlbumMoreClick: (Album) -> Unit,
     onArtistClick: (com.example.music_base.data.model.Artist) -> Unit = {},
     isLoadingMore: Boolean = false,
-    onLoadMore: () -> Unit = {}
+    onLoadMore: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     var selectedSort by remember { mutableStateOf("Default") }
     var isGridView by remember { mutableStateOf(type == ShowAllType.TOP_ALBUMS || type == ShowAllType.TOP_ARTISTS) }
@@ -93,7 +94,7 @@ fun ShowAllScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
 
         Column(modifier = Modifier.fillMaxSize()) {
             // Header

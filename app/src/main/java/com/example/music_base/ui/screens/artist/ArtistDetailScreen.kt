@@ -53,12 +53,13 @@ fun ArtistDetailScreen(
     isShuffleEnabled: Boolean = false,
     onShuffleClick: () -> Unit = {},
     onRefresh: () -> Unit = {},
-    onShare: (Track) -> Unit = {}
+    onShare: (Track) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     var trackForMenu by remember { mutableStateOf<Track?>(null) }
 
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         PullToRefreshBox(
             isRefreshing = isLoading,
             onRefresh = onRefresh,

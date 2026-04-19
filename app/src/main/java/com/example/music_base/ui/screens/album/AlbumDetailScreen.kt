@@ -51,7 +51,8 @@ fun AlbumDetailScreen(
     isShuffleEnabled: Boolean = false,
     onFavoriteClick: (Album) -> Unit,
     onRefresh: () -> Unit = {},
-    onShare: (Track) -> Unit = {}
+    onShare: (Track) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     var trackForMenu by remember { mutableStateOf<Track?>(null) }
 
@@ -64,7 +65,7 @@ fun AlbumDetailScreen(
     val durationLabel = if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
     val trackCountLabel = "${tracks.size} songs"
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         PullToRefreshBox(
             isRefreshing = isLoading,
             onRefresh = onRefresh,
