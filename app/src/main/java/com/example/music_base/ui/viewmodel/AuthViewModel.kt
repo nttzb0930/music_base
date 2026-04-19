@@ -8,8 +8,11 @@ import com.example.music_base.data.model.RegisterRequest
 import com.example.music_base.data.model.User
 import com.example.music_base.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed class AuthState {
@@ -25,6 +28,14 @@ sealed class AuthState {
 class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
+    
+    val currentUser: StateFlow<User?> = _authState
+        .map { (it as? AuthState.Authenticated)?.user }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
     
     val accessToken = repository.accessToken
 

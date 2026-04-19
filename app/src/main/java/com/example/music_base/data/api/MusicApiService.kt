@@ -94,6 +94,11 @@ interface MusicApiService {
         @Body request: Map<String, Any>
     ): Response<MessageResponse>
 
+    @POST("tracks/sync-url")
+    suspend fun syncTrackFromUrl(
+        @Body request: Map<String, String>
+    ): Response<MessageResponse>
+
     // --- USERS / FOLLOWS ---
     @GET("users/me/follows")
     suspend fun getFollowedArtists(): Response<List<FollowResponse>>

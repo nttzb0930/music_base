@@ -14,6 +14,9 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -24,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.music_base.data.model.Track
+import com.example.music_base.data.model.User
 import com.example.music_base.ui.components.*
 import com.example.music_base.ui.screens.home.HomeScreen
 import com.example.music_base.ui.screens.player.PlayerScreen
@@ -54,6 +58,8 @@ import com.example.music_base.ui.screens.library.LibraryScreen
 import com.example.music_base.ui.screens.library.LikedTracksScreen
 import com.example.music_base.ui.components.SonicToast
 import com.example.music_base.ui.components.ToastType
+import com.example.music_base.ui.screens.admin.AdminDashboardScreen
+import com.example.music_base.ui.screens.admin.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -153,7 +159,17 @@ fun AuthGatewayFlow(viewModel: AuthViewModel) {
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel) {
+    val currentUser by authViewModel.currentUser.collectAsState()
     var selectedNavItem by remember { mutableStateOf(BottomNavItem.Home) }
+    var selectedAdminItem by remember { mutableStateOf(AdminBottomNavItem.Command) }
+    var isAdminModeActive by remember { mutableStateOf<Boolean>(currentUser?.isAdmin == true) }
+    
+    // Auto-activate admin mode for admins on login, but allow manual toggle
+    LaunchedEffect(currentUser) {
+        if (currentUser?.isAdmin == true) {
+            isAdminModeActive = true
+        }
+    }
     val context = LocalContext.current
     val playbackIsPlaying by MusicPlayerManager.isPlaying.collectAsState()
     val playbackPosition by MusicPlayerManager.currentPosition.collectAsState()
@@ -177,7 +193,7 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
     
     val accessToken by authViewModel.accessToken.collectAsState(initial = null)
     val authState by authViewModel.authState.collectAsState()
-    val currentUser = (authState as? AuthState.Authenticated)?.user
+    // Explicitly removed duplicate currentUser shadowing to prevent unresolved references
 
     LaunchedEffect(currentTrack?.id) {
         if (currentTrack != null) {
@@ -267,36 +283,118 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
         else if (showAllScreenType != null) showAllScreenType = null
     }
 
+    val screenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val screenHeight = maxHeight
+        val isOverlayVisible = showPlayer || showSettings || showAlbumDetail ||
+                               showArtistDetail || showPlaylistDetail ||
+                               showLikedTracks || (showAllScreenType != null)
 
         // ── BASE LAYER: Scaffold with nav only ──
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                MusicTopAppBar(
-                    title = when (selectedNavItem) {
-                        BottomNavItem.Home -> "Music-Base"
-                        BottomNavItem.Search -> "Search"
-                        BottomNavItem.Library -> "Your Library"
-                        BottomNavItem.Profile -> "Profile"
-                    },
-                    username = currentUser?.displayName,
-                    userAvatarUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuDpnImc8ni-aAddAenXQt3FvuJOl3tgnNmyxG43Hk6gpO823q_vWltPkSpcjGd2dp3dVhE7lJ96UXc4XTByK22kij7X0XiPbgD0M7E5uqK-2ZSU4cAGFNi4WFZn52nuvkKKYbdtp36_sd5FQ9ax3OcdDk1PwNeSUSxyON8jKiCD7gUQPiWYKQ5vsbLYY2IZC2VK8KkxfuxSYMSVrgAP4uM-dlozAFrYUA4LgfOOJN446ZPGLjoOi5HIOvunrXIcnrCH5-vfsbGzgp0",
-                    onSettingsClick = { showSettings = true }
-                )
+                if (!isOverlayVisible) {
+                    MusicTopAppBar(
+                        title = when (selectedNavItem) {
+                            BottomNavItem.Home -> "Music-Base"
+                            BottomNavItem.Search -> "Search"
+                            BottomNavItem.Library -> "Your Library"
+                            BottomNavItem.Profile -> "Profile"
+                        },
+                        username = currentUser?.displayName,
+                        userAvatarUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuDpnImc8ni-aAddAenXQt3FvuJOl3tgnNmyxG43Hk6gpO823q_vWltPkSpcjGd2dp3dVhE7lJ96UXc4XTByK22kij7X0XiPbgD0M7E5uqK-2ZSU4cAGFNi4WFZn52nuvkKKYbdtp36_sd5FQ9ax3OcdDk1PwNeSUSxyON8jKiCD7gUQPiWYKQ5vsbLYY2IZC2VK8KkxfuxSYMSVrgAP4uM-dlozAFrYUA4LgfOOJN446ZPGLjoOi5HIOvunrXIcnrCH5-vfsbGzgp0",
+                        onSettingsClick = { showSettings = true },
+                        adminToggle = if (currentUser?.isAdmin == true) {
+                            {
+                                isAdminModeActive = !isAdminModeActive
+                                // Reset nav items when switching modes
+                                if (isAdminModeActive) selectedAdminItem = AdminBottomNavItem.Command
+                                else selectedNavItem = BottomNavItem.Home
+                            }
+                        } else null,
+                        isAdminMode = isAdminModeActive
+                    )
+                }
             },
             bottomBar = {
-                MusicBottomNavigation(
-                    selectedItem = selectedNavItem,
-                    onItemSelected = { selectedNavItem = it }
-                )
+                if (!isOverlayVisible) {
+                    if (isAdminModeActive && currentUser?.isAdmin == true) {
+                        AdminBottomNavigation(
+                            selectedItem = selectedAdminItem,
+                            onItemSelected = { selectedAdminItem = it }
+                        )
+                    } else {
+                        MusicBottomNavigation(
+                            selectedItem = selectedNavItem,
+                            onItemSelected = { selectedNavItem = it }
+                        )
+                    }
+                }
             }
         ) { paddingValues ->
-            // Navigation screens only
             Box(Modifier.fillMaxSize().padding(paddingValues)) {
-                AnimatedContent(
-                    targetState = selectedNavItem,
+                if (isAdminModeActive && currentUser?.isAdmin == true) {
+                    // --- ADMIN MODE CONTENT ---
+                    AnimatedContent(
+                        targetState = selectedAdminItem,
+                        label = "adminNavTransition"
+                    ) { adminNavItem ->
+                        when (adminNavItem) {
+                            AdminBottomNavItem.Command -> {
+                                val uiState by musicViewModel.uiState.collectAsState()
+                                val recentTracks = when (val s = uiState) {
+                                    is MusicState.Success -> s.tracks
+                                    else -> emptyList()
+                                }
+                                val totalTrackCount by musicViewModel.totalTrackCount.collectAsState()
+                                AdminDashboardScreen(
+                                    recentTracks = recentTracks,
+                                    totalTrackCount = totalTrackCount,
+                                    onEditTrack = { track ->
+                                        musicViewModel.setToastMessage("Edit logic for ${track.title}")
+                                    },
+                                    onDeleteTrack = { track ->
+                                        musicViewModel.deleteTrack(track.id)
+                                    }
+                                )
+                            }
+                            AdminBottomNavItem.Ingest -> {
+                                AdminIngestScreen(
+                                    onUploadAudio = { title, artist ->
+                                        musicViewModel.uploadAudio(title, artist)
+                                    },
+                                    onSyncUrl = { url ->
+                                        musicViewModel.syncTrackFromUrl(url)
+                                    }
+                                )
+                            }
+                            AdminBottomNavItem.Database -> {
+                                val allTracks by musicViewModel.tracks.collectAsState()
+                                val isAdminLoading by musicViewModel.isAdminLoading.collectAsState()
+                                
+                                LaunchedEffect(Unit) {
+                                    if (allTracks.isEmpty()) {
+                                        musicViewModel.loadAdminTracks(isRefresh = true)
+                                    }
+                                }
+
+                                AdminDatabaseScreen(
+                                    tracks = allTracks,
+                                    isLoading = isAdminLoading,
+                                    onLoadMore = { musicViewModel.loadAdminTracks() },
+                                    onSearch = { query -> musicViewModel.loadAdminTracks(isRefresh = true, query = query) },
+                                    onEditTrack = { track -> musicViewModel.updateTrackMock(track) },
+                                    onDeleteTrack = { track -> musicViewModel.deleteTrack(track.id) },
+                                    onRefresh = { musicViewModel.loadAdminTracks(isRefresh = true) }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // --- LISTENER MODE CONTENT ---
+                    AnimatedContent(
+                        targetState = selectedNavItem,
                     transitionSpec = {
                         val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
                         (slideInHorizontally(tween(500)) { fullWidth -> direction * fullWidth } + fadeIn(tween(400)))
@@ -305,65 +403,67 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                     label = "navTransition"
                 ) { targetNavItem ->
                     when (targetNavItem) {
-                        BottomNavItem.Home -> HomeScreen(
-                            viewModel = musicViewModel,
-                            accessToken = accessToken,
-                            onTrackClick = { track, tracks ->
-                                scope.launch {
-                                    val fullTrack = musicViewModel.fetchTrackDetail(track.id)
-                                    val index = tracks.indexOf(track).coerceAtLeast(0)
-                                    if (fullTrack != null && !fullTrack.audioUrl.isNullOrBlank()) {
-                                        val updatedTracks = tracks.toMutableList()
-                                        if (index < updatedTracks.size) updatedTracks[index] = fullTrack
-                                        MusicPlayerManager.setQueue(updatedTracks, index)
-                                        playingFrom = "Home"
-                                        showPlayer = true
-                                    } else {
-                                        Toast.makeText(context, "Cannot play: Missing audio URL", Toast.LENGTH_SHORT).show()
+                        BottomNavItem.Home -> {
+                            HomeScreen(
+                                viewModel = musicViewModel,
+                                accessToken = accessToken,
+                                onTrackClick = { track, tracks ->
+                                    scope.launch {
+                                        val fullTrack = musicViewModel.fetchTrackDetail(track.id)
+                                        val index = tracks.indexOf(track).coerceAtLeast(0)
+                                        if (fullTrack != null && !fullTrack.audioUrl.isNullOrBlank()) {
+                                            val updatedTracks = tracks.toMutableList()
+                                            if (index < updatedTracks.size) updatedTracks[index] = fullTrack
+                                            MusicPlayerManager.setQueue(updatedTracks, index)
+                                            playingFrom = "Home"
+                                            showPlayer = true
+                                        } else {
+                                            Toast.makeText(context, "Cannot play: Missing audio URL", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
-                                }
-                            },
-                            onArtistClick = { artist ->
-                                openedArtist = artist
-                                musicViewModel.getArtistTracks(artist.id)
-                                showArtistDetail = true
-                            },
-                            onAlbumClick = { album ->
-                                openedAlbum = album
-                                musicViewModel.getAlbumDetail(album.id)
-                                showAlbumDetail = true
-                            },
-                            onPlaylistClick = { playlist ->
-                                openedPlaylist = playlist
-                                musicViewModel.getPlaylistDetail(playlist.id)
-                                showPlaylistDetail = true
-                            },
-                            onShowAllClick = { type ->
-                                showAllScreenType = null // Reset first to avoid transition issues
-                                showAllScreenType = type
-                            },
-                            onContinueListeningClick = { index, tracks, listenedSeconds ->
-                                scope.launch {
-                                    val track = tracks[index]
-                                    val fullTrack = musicViewModel.fetchTrackDetail(track.id)
-                                    if (fullTrack != null && !fullTrack.audioUrl.isNullOrBlank()) {
-                                        val updatedTracks = tracks.toMutableList()
-                                        updatedTracks[index] = fullTrack
-                                        MusicPlayerManager.setQueue(
-                                            updatedTracks, 
-                                            index, 
-                                            if (listenedSeconds > 2) listenedSeconds * 1000L else 0L
-                                        )
-                                        playingFrom = "Continue Listening"
-                                        showPlayer = true
-                                    } else {
-                                        Toast.makeText(context, "Cannot play: Missing audio URL", Toast.LENGTH_SHORT).show()
+                                },
+                                onArtistClick = { artist ->
+                                    openedArtist = artist
+                                    musicViewModel.getArtistTracks(artist.id)
+                                    showArtistDetail = true
+                                },
+                                onAlbumClick = { album ->
+                                    openedAlbum = album
+                                    musicViewModel.getAlbumDetail(album.id)
+                                    showAlbumDetail = true
+                                },
+                                onPlaylistClick = { playlist ->
+                                    openedPlaylist = playlist
+                                    musicViewModel.getPlaylistDetail(playlist.id)
+                                    showPlaylistDetail = true
+                                },
+                                onShowAllClick = { type ->
+                                    showAllScreenType = null // Reset first to avoid transition issues
+                                    showAllScreenType = type
+                                },
+                                onContinueListeningClick = { index, tracks, listenedSeconds ->
+                                    scope.launch {
+                                        val track = tracks[index]
+                                        val fullTrack = musicViewModel.fetchTrackDetail(track.id)
+                                        if (fullTrack != null && !fullTrack.audioUrl.isNullOrBlank()) {
+                                            val updatedTracks = tracks.toMutableList()
+                                            updatedTracks[index] = fullTrack
+                                            MusicPlayerManager.setQueue(
+                                                updatedTracks, 
+                                                index, 
+                                                if (listenedSeconds > 2) listenedSeconds * 1000L else 0L
+                                            )
+                                            playingFrom = "Continue Listening"
+                                            showPlayer = true
+                                        } else {
+                                            Toast.makeText(context, "Cannot play: Missing audio URL", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
-                                }
-                            },
-                            onAddToPlaylist = onAddToPlaylistGlobal,
-                            onShare = onShareGlobal
-                        )
+                                },
+                                onAddToPlaylist = onAddToPlaylistGlobal,
+                                onShare = onShareGlobal
+                            )
+                        }
 
                         BottomNavItem.Search -> com.example.music_base.ui.screens.search.SearchScreen(
                             viewModel = musicViewModel,
@@ -435,9 +535,10 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                     }
                 }
             }
+        }
 
-            // MiniPlayer — sits above bottom nav but respects Scaffold padding
-            Box(
+        // MiniPlayer — sits above bottom nav but respects Scaffold padding
+        Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.BottomCenter
             ) {
@@ -468,7 +569,7 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
             }
         }
 
-        // ── OVERLAY LAYERS: outside Scaffold → covers full screen ──
+    // ── OVERLAY LAYERS: outside Scaffold → covers full screen ──
 
         // Show All Overlay (Lowest in Z-order among overlays)
         AnimatedVisibility(

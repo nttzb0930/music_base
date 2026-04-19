@@ -1,6 +1,8 @@
 package com.example.music_base.ui.screens.search
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -118,9 +120,11 @@ fun SearchScreen(
                 // Search results
                 if (searchResults.isEmpty() && !isSearching) {
                     item {
-                        Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                            Text("No results found for \"$searchQuery\"", color = Color.Gray)
-                        }
+                        SearchPulseSyncModule(
+                            query = searchQuery,
+                            onSync = { url -> viewModel.syncTrackFromUrl(url) },
+                            isSyncing = viewModel.isSyncingFromUrl.collectAsState().value
+                        )
                     }
                 } else {
                     items(searchResults) { track ->
@@ -252,5 +256,111 @@ fun CategoryCard(category: Category) {
             fontWeight = FontWeight.ExtraBold,
             color = Color.White
         )
+    }
+}
+
+@Composable
+fun SearchPulseSyncModule(
+    query: String,
+    onSync: (String) -> Unit,
+    isSyncing: Boolean
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    var url by remember { mutableStateOf("") }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp)
+            .animateContentSize()
+            .clip(RoundedCornerShape(Dimens.radiusLarge))
+            .background(Color.White.copy(alpha = 0.03f))
+            .border(
+                width = 1.dp,
+                color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.05f),
+                shape = RoundedCornerShape(Dimens.radiusLarge)
+            )
+            .clickable { if (!isSyncing) isExpanded = !isExpanded }
+            .padding(Dimens.paddingLarge),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (isSyncing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(32.dp),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 3.dp
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Pulse Syncing: Extracting discovery...",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
+            )
+            Text(
+                "This usually takes 30-60 seconds",
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 12.sp
+            )
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = "No results for \"$query\"",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            
+            Text(
+                text = "Don't see your track? Pulse Sync from YouTube",
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            
+            if (isExpanded) {
+                Spacer(Modifier.height(24.dp))
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("Paste YouTube Link") },
+                    placeholder = { Text("https://youtube.com/watch?v=...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f)
+                    ),
+                    shape = RoundedCornerShape(Dimens.radiusMedium)
+                )
+                
+                Spacer(Modifier.height(16.dp))
+                
+                Button(
+                    onClick = { 
+                        if (url.isNotBlank()) {
+                            onSync(url)
+                            isExpanded = false
+                            url = ""
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(Dimens.radiusMedium)
+                ) {
+                    Text("Sync Now", color = Color.Black, fontWeight = FontWeight.Black)
+                }
+            }
+        }
     }
 }

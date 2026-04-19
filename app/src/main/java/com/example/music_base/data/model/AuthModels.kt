@@ -8,6 +8,15 @@ data class User(
     @SerializedName("username") val username: String? = null,
     @SerializedName("role") val role: String? = null
 ) {
+    /**
+     * Centralized role check to avoid hardcoded string comparisons across the app.
+     */
+    val userRole: UserRole
+        get() = UserRole.fromString(role)
+
+    val isAdmin: Boolean
+        get() = userRole == UserRole.ADMIN
+
     val displayName: String
         get() = when {
             !username.isNullOrBlank() -> username

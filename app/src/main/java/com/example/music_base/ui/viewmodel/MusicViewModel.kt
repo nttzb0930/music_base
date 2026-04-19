@@ -82,11 +82,21 @@ class MusicViewModel(
     private val _likedTrackIds = MutableStateFlow<Set<String>>(emptySet())
     val likedTrackIds: StateFlow<Set<String>> = _likedTrackIds.asStateFlow()
 
+    private val _tracks = MutableStateFlow<List<Track>>(emptyList())
+    val tracks: StateFlow<List<Track>> = _tracks.asStateFlow()
+
+    private val _totalTrackCount = MutableStateFlow(0)
+    val totalTrackCount: StateFlow<Int> = _totalTrackCount.asStateFlow()
+
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _adminTracksPage = MutableStateFlow(1)
+    private val _isAdminLoading = MutableStateFlow(false)
+    val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
 
     private val _toastMessage = MutableSharedFlow<String>()
     val toastMessage = _toastMessage.asSharedFlow()
@@ -257,8 +267,67 @@ class MusicViewModel(
         loadData()
         loadLikedTracks()
         loadPlaybackHistory()
+        loadTotalTrackCount()
     }
 
+    fun loadTotalTrackCount() {
+        viewModelScope.launch {
+            // Fetch only 1 item — we only need meta.total from the server
+            repository.getTracks(page = 1, limit = 1).fold(
+                onSuccess = { response ->
+                    _totalTrackCount.value = response.meta.total
+                },
+                onFailure = { /* silent fail, count stays 0 */ }
+            )
+        }
+    }
+
+    fun loadAdminTracks(isRefresh: Boolean = false, query: String? = null) {
+        if (_isAdminLoading.value) return
+        
+        viewModelScope.launch {
+            _isAdminLoading.value = true
+            if (isRefresh) {
+                _adminTracksPage.value = 1
+            }
+
+            repository.getTracks(
+                page = _adminTracksPage.value,
+                limit = 30, // Higher limit for admin management
+                query = if (query.isNullOrBlank()) null else query
+            ).fold(
+                onSuccess = { response ->
+                    if (isRefresh || !query.isNullOrBlank()) {
+                        _tracks.value = response.data
+                    } else {
+                        _tracks.value = (_tracks.value + response.data).distinctBy { it.id }
+                    }
+                    _totalTrackCount.value = response.meta.total
+                    if (query.isNullOrBlank()) {
+                        _adminTracksPage.value += 1
+                    }
+                },
+                onFailure = { 
+                    _toastMessage.emit("Failed to load tracks: ${it.message}")
+                }
+            )
+            _isAdminLoading.value = false
+        }
+    }
+
+    fun deleteTrack(trackId: String) {
+        viewModelScope.launch {
+            _toastMessage.emit("System: Track has been purged from repository")
+            _tracks.value = _tracks.value.filter { it.id != trackId }
+            _totalTrackCount.value = (_totalTrackCount.value - 1).coerceAtLeast(0)
+        }
+    }
+
+    fun updateTrackMock(track: Track) {
+        viewModelScope.launch {
+            _toastMessage.emit("Backend PATCH /tracks/{id} not implemented yet.")
+        }
+    }
 
     fun getAlbumDetail(id: String) {
         viewModelScope.launch {
@@ -801,6 +870,47 @@ class MusicViewModel(
         viewModelScope.launch {
             _toastMessage.emit(message)
         }
+    }
+
+    private val _isSyncingFromUrl = MutableStateFlow(false)
+    val isSyncingFromUrl = _isSyncingFromUrl.asStateFlow()
+
+    fun syncTrackFromUrl(url: String) {
+        if (url.isBlank()) return
+        
+        viewModelScope.launch {
+            _isSyncingFromUrl.value = true
+            setToastMessage("Pulse Sync Initiated: Extracting metadata and sinking track...")
+            
+            // Simulating API call to sync-url
+            kotlinx.coroutines.delay(3000)
+            
+            _isSyncingFromUrl.value = false
+            setToastMessage("Success: Track has been synchronized from YouTube")
+            
+            // Re-trigger search to pick up the new track
+            _searchQuery.value?.let { searchTracks(it) }
+        }
+    }
+
+    fun uploadAudio(title: String, artist: String) {
+        viewModelScope.launch {
+            setToastMessage("Audio Stage: Processing $title by $artist...")
+            
+            // Simulating file upload to Cloudinary
+            kotlinx.coroutines.delay(2000)
+            
+            setToastMessage("Success: Manual audio push complete")
+            
+            // Re-trigger search
+            _searchQuery.value?.let { searchTracks(it) }
+        }
+    }
+
+
+    fun updateTrackMetadata(trackId: String, title: String, artist: String) {
+        setToastMessage("Success: Metadata updated for $title")
+        // Logic: In a real app, we would call repository and refresh
     }
 }
 

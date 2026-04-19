@@ -24,7 +24,9 @@ fun MusicTopAppBar(
     title: String = "Q2T Music",
     username: String? = null,
     userAvatarUrl: String? = null,
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    adminToggle: (() -> Unit)? = null,
+    isAdminMode: Boolean = false
 ) {
     Surface(
         modifier = modifier
@@ -85,16 +87,34 @@ fun MusicTopAppBar(
                 }
             }
             
-            // Right: Settings Icon
-            IconButton(
-                onClick = onSettingsClick,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            // Right side actions
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (adminToggle != null) {
+                    TextButton(
+                        onClick = adminToggle,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = if (isAdminMode) MaterialTheme.colorScheme.secondary else Color.White.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        Text(
+                            text = if (isAdminMode) "MANAGER" else "GO ADMIN",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+
+                IconButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

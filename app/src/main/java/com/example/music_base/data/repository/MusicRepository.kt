@@ -141,6 +141,10 @@ class MusicRepository(private val apiService: MusicApiService) {
         return handleApi { apiService.toggleTrackLike(TrackLikeRequest(trackId)) }
     }
 
+    suspend fun syncTrackFromUrl(url: String): Result<MessageResponse> {
+        return handleApi { apiService.syncTrackFromUrl(mapOf("url" to url)) }
+    }
+
     suspend fun getLikedTracks(
         page: Int = 1,
         limit: Int = 50,
