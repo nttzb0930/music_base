@@ -932,7 +932,13 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
         ) {
             currentTrack?.let { track ->
                 PlayerScreen(
-                    modifier = Modifier.fillMaxWidth().height(screenHeight),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(screenHeight)
+                        .pointerInput(Unit) { 
+                            // This block consumes all touch events, 
+                            // preventing them from leaking to the background
+                        },
                     track = track.copy(currentPosition = playbackPosition, duration = playbackDuration.toDouble() / 1000.0),
                     isPlaying = playbackIsPlaying,
                     userPlaylists = userPlaylists,
