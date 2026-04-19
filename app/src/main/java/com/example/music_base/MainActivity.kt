@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
                     factory = AuthViewModel.Factory(app.authRepository)
                 )
                 val musicViewModel: MusicViewModel = viewModel(
-                    factory = MusicViewModel.Factory(app.musicRepository)
+                    factory = MusicViewModel.Factory(app.musicRepository, app.stashRepository)
                 )
                 
                 MusicMainApp(authViewModel, musicViewModel)
@@ -344,20 +344,33 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                     ) { adminNavItem ->
                         when (adminNavItem) {
                             AdminBottomNavItem.Command -> {
-                                val uiState by musicViewModel.uiState.collectAsState()
-                                val recentTracks = when (val s = uiState) {
-                                    is MusicState.Success -> s.tracks
-                                    else -> emptyList()
-                                }
-                                val totalTrackCount by musicViewModel.totalTrackCount.collectAsState()
+                                val stashOverview by musicViewModel.stashOverview.collectAsState()
+                                val stashRecent by musicViewModel.stashRecent.collectAsState()
+                                val stashTopTracks by musicViewModel.stashTopTracks.collectAsState()
+                                val isDashboardLoading by musicViewModel.isDashboardLoading.collectAsState()
+
                                 AdminDashboardScreen(
-                                    recentTracks = recentTracks,
-                                    totalTrackCount = totalTrackCount,
-                                    onEditTrack = { track ->
-                                        musicViewModel.setToastMessage("Edit logic for ${track.title}")
+                                    overview = stashOverview,
+                                    recent = stashRecent,
+                                    topTracks = stashTopTracks,
+                                    isLoading = isDashboardLoading,
+                                    onRefresh = { musicViewModel.loadStashDashboard() },
+                                    onTrackClick = { id -> 
+                                        scope.launch {
+                                            val detail = musicViewModel.fetchTrackDetail(id)
+                                            if (detail != null) {
+                                                MusicPlayerManager.setQueue(listOf(detail), 0)
+                                                showPlayer = true
+                                            }
+                                        }
                                     },
-                                    onDeleteTrack = { track ->
-                                        musicViewModel.deleteTrack(track.id)
+                                    onArtistClick = { id ->
+                                        openedArtist = Artist(id, "Loading...", "", "", null, null, "", "") // Dummy for now
+                                        musicViewModel.getArtistTracks(id)
+                                        showArtistDetail = true
+                                    },
+                                    onUserClick = { id ->
+                                        musicViewModel.setToastMessage("User profile view not implemented ($id)")
                                     }
                                 )
                             }

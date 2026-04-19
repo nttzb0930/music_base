@@ -22,119 +22,238 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.music_base.data.model.Track
+import com.example.music_base.data.model.*
 import com.example.music_base.ui.theme.Dimens
 import com.example.music_base.ui.theme.Primary
 import com.example.music_base.ui.theme.Secondary
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
 @Composable
 fun AdminDashboardScreen(
-    recentTracks: List<Track> = emptyList(),
-    totalTrackCount: Int = 0,
-    onEditTrack: (Track) -> Unit,
-    onDeleteTrack: (Track) -> Unit
+    overview: StashOverview?,
+    recent: StashRecent?,
+    topTracks: StashTopTracks?,
+    isLoading: Boolean,
+    onRefresh: () -> Unit,
+    onTrackClick: (String) -> Unit,
+    onArtistClick: (String) -> Unit,
+    onUserClick: (String) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = Dimens.paddingLarge),
-        verticalArrangement = Arrangement.spacedBy(Dimens.paddingLarge),
-        contentPadding = PaddingValues(top = Dimens.paddingLarge, bottom = 120.dp)
-    ) {
-        item {
-            HeaderSection()
-        }
+    var selectedRecentTab by remember { mutableStateOf(0) }
+    val tabs = listOf("Tracks", "Artists", "Albums", "Users", "Playlists")
 
-        // --- Statistics Panorama ---
-        item {
-            StatisticsPanorama(totalTracks = totalTrackCount)
+    LaunchedEffect(Unit) {
+        if (overview == null) {
+            onRefresh()
         }
+    }
 
-        // --- System Health Summary ---
-        item {
-            ContentSection(title = "Service Integrity") {
-                Column(verticalArrangement = Arrangement.spacedBy(Dimens.paddingNormal)) {
-                    ActivityItem("Railway API Engine", "Operational", Icons.Default.CloudDone)
-                    ActivityItem("Cloudinary Storage", "Secure Connection", Icons.Default.Dns)
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = Dimens.paddingLarge),
+            verticalArrangement = Arrangement.spacedBy(Dimens.paddingLarge),
+            contentPadding = PaddingValues(top = Dimens.paddingLarge, bottom = 120.dp)
+        ) {
+            item {
+                HeaderSection(isLoading, onRefresh)
+            }
+
+            // --- Statistics Panorama ---
+            item {
+                if (overview != null) {
+                    StatisticsPanorama(overview)
+                } else if (isLoading) {
+                    Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Primary)
+                    }
+                }
+            }
+
+            // --- Top Tracks Leaderboard ---
+            item {
+                ContentSection(title = "Top Performing Tracks") {
+                    if (topTracks != null) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Dimens.paddingSmall)) {
+                            topTracks.data.take(5).forEachIndexed { index, track ->
+                                TopTrackItem(index + 1, track, onTrackClick)
+                            }
+                        }
+                    } else if (isLoading) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Primary)
+                    }
+                }
+            }
+
+            // --- Recent Activity Center ---
+            item {
+                Column {
+                    Text(
+                        text = "Real-time Activity",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(bottom = Dimens.paddingSmall)
+                    )
+                    
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedRecentTab,
+                        containerColor = Color.Transparent,
+                        contentColor = Primary,
+                        edgePadding = 0.dp,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            TabRowDefaults.Indicator(
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedRecentTab]),
+                                color = Primary
+                            )
+                        }
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            Tab(
+                                selected = selectedRecentTab == index,
+                                onClick = { selectedRecentTab = index },
+                                text = { Text(title, fontSize = 12.sp) }
+                            )
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(Dimens.paddingNormal))
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Dimens.radiusLarge))
+                            .background(Color.White.copy(alpha = 0.03f))
+                            .border(0.5.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(Dimens.radiusLarge))
+                            .padding(Dimens.paddingNormal)
+                    ) {
+                        AnimatedContent(targetState = selectedRecentTab, label = "recentTab") { tabIndex ->
+                            RecentContentList(tabIndex, recent, onTrackClick, onArtistClick, onUserClick)
+                        }
+                    }
+                }
+            }
+
+            // --- System Health ---
+            item {
+                ContentSection(title = "Network Infrastructure") {
+                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.paddingNormal)) {
+                        ActivityItem("Primary API Gateway", "Stable - 42ms", Icons.Default.CloudDone)
+                        ActivityItem("Edge CDN Node", "Optimized", Icons.Default.Router)
+                        ActivityItem("Auth Engine", "Active Session Layer", Icons.Default.Security)
+                    }
                 }
             }
         }
-
-        // --- Track Commander ---
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Library Overview",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    text = "${recentTracks.size} items",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.4f)
-                )
-            }
-        }
         
-        if (recentTracks.isEmpty()) {
-            item {
-                EmptyTracksPlaceholder()
-            }
-        } else {
-            items(recentTracks.take(15)) { track -> 
-                TrackManagementItem(
-                    track = track,
-                    onEdit = { onEditTrack(track) },
-                    onDelete = { onDeleteTrack(track) }
-                )
+        if (isLoading && overview == null) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Primary)
             }
         }
     }
 }
 
 @Composable
-private fun HeaderSection() {
-    Column {
-        Text(
-            text = "Console Central",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Text(
-            text = "Professional Management Engine",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.6f)
-        )
-    }
-}
-
-@Composable
-private fun StatisticsPanorama(totalTracks: Int) {
+private fun HeaderSection(isLoading: Boolean, onRefresh: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Dimens.paddingNormal)
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        StatCard(
-            modifier = Modifier.weight(1f),
-            title = "Active Users",
-            value = "1.2K",
-            icon = Icons.Default.Groups,
-            gradient = listOf(Primary.copy(alpha = 0.2f), Color.Transparent)
-        )
-        StatCard(
-            modifier = Modifier.weight(1f),
-            title = "Total Tracks",
-            value = totalTracks.toString(),
-            icon = Icons.Default.GraphicEq,
-            gradient = listOf(Secondary.copy(alpha = 0.2f), Color.Transparent)
-        )
+        Column {
+            Text(
+                text = "Console Central",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = "Intelligence & Analytics Hub",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.6f)
+            )
+        }
+        
+        IconButton(
+            onClick = onRefresh,
+            modifier = Modifier
+                .clip(RoundedCornerShape(Dimens.radiusSmall))
+                .background(Color.White.copy(alpha = 0.05f))
+        ) {
+            Icon(
+                Icons.Default.Refresh,
+                contentDescription = "Refresh",
+                tint = Color.White,
+                modifier = Modifier.padding(4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatisticsPanorama(overview: StashOverview) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.paddingNormal)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.paddingNormal)
+        ) {
+            StatCard(
+                modifier = Modifier.weight(1f),
+                title = "Total Users",
+                value = overview.totalUsers.toString(),
+                subValue = "+${overview.newUsersLast7Days} this week",
+                icon = Icons.Default.Groups,
+                gradient = listOf(Primary.copy(alpha = 0.15f), Color.Transparent)
+            )
+            StatCard(
+                modifier = Modifier.weight(1f),
+                title = "Live Tracks",
+                value = overview.totalTracks.toString(),
+                subValue = "${overview.totalTracksWithAudio} with audio",
+                icon = Icons.Default.GraphicEq,
+                gradient = listOf(Secondary.copy(alpha = 0.15f), Color.Transparent)
+            )
+        }
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.paddingNormal)
+        ) {
+            StatCard(
+                modifier = Modifier.weight(1f),
+                title = "Artists",
+                value = overview.totalArtists.toString(),
+                subValue = "+${overview.newArtistsLast7Days} new",
+                icon = Icons.Default.Person,
+                gradient = listOf(Color.Cyan.copy(alpha = 0.1f), Color.Transparent)
+            )
+            StatCard(
+                modifier = Modifier.weight(1f),
+                title = "Engagement",
+                value = "${(overview.totalPlaybackHistory / 1000f).coerceAtLeast(0.1f)}K",
+                subValue = "Play events",
+                icon = Icons.Default.Insights,
+                gradient = listOf(Color.Magenta.copy(alpha = 0.1f), Color.Transparent)
+            )
+        }
+
+        // Mini detail row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.paddingNormal)
+        ) {
+            MiniStatCard(Modifier.weight(1f), "Albums", overview.totalAlbums.toString(), Icons.Default.Album)
+            MiniStatCard(Modifier.weight(1f), "Playlists", overview.totalPlaylists.toString(), Icons.Default.QueueMusic)
+            MiniStatCard(Modifier.weight(1f), "Likes", overview.totalTrackLikes.toString(), Icons.Default.Favorite)
+        }
     }
 }
 
@@ -193,6 +312,7 @@ fun StatCard(
     modifier: Modifier = Modifier,
     title: String,
     value: String,
+    subValue: String,
     icon: ImageVector,
     gradient: List<Color>
 ) {
@@ -201,14 +321,134 @@ fun StatCard(
             .clip(RoundedCornerShape(Dimens.radiusLarge))
             .background(Brush.verticalGradient(gradient))
             .border(0.5.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(Dimens.radiusLarge))
-            .padding(Dimens.paddingNormal)
+            .padding(Dimens.paddingLarge)
     ) {
         Column {
-            Icon(imageVector = icon, contentDescription = null, tint = Primary, modifier = Modifier.size(28.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = icon, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(text = title, fontSize = 12.sp, color = Color.White.copy(alpha = 0.5f))
+            }
             Spacer(Modifier.height(Dimens.paddingSmall))
-            Text(text = value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(text = title, fontSize = 12.sp, color = Color.White.copy(alpha = 0.5f))
+            Text(text = value, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            Text(text = subValue, fontSize = 10.sp, color = Primary.copy(alpha = 0.7f), fontWeight = FontWeight.Medium)
         }
+    }
+}
+
+@Composable
+fun MiniStatCard(modifier: Modifier = Modifier, title: String, value: String, icon: ImageVector) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(Dimens.radiusMedium))
+            .background(Color.White.copy(alpha = 0.04f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(Dimens.radiusMedium))
+            .padding(Dimens.paddingNormal),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(title, color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+fun TopTrackItem(rank: Int, track: StashTrackItem, onClick: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick(track.id) }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "#$rank",
+            modifier = Modifier.width(32.dp),
+            style = MaterialTheme.typography.titleSmall,
+            color = if (rank <= 3) Primary else Color.White.copy(alpha = 0.3f),
+            fontWeight = FontWeight.Bold
+        )
+        Column(Modifier.weight(1f)) {
+            Text(track.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(track.artistName, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp, maxLines = 1)
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text("${track.viewCount ?: 0}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text("VIEWS", color = Primary.copy(alpha = 0.6f), fontSize = 9.sp, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+fun RecentContentList(
+    tabIndex: Int,
+    recent: StashRecent?,
+    onTrackClick: (String) -> Unit,
+    onArtistClick: (String) -> Unit,
+    onUserClick: (String) -> Unit
+) {
+    if (recent == null) {
+        Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+            Text("Initializing feeds...", color = Color.White.copy(alpha = 0.3f))
+        }
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        when (tabIndex) {
+            0 -> recent.tracks.forEach { track ->
+                RecentItemRow(track.title, track.artistName, track.createdAt, Icons.Default.MusicNote) { onTrackClick(track.id) }
+            }
+            1 -> recent.artists.forEach { artist ->
+                RecentItemRow(artist.name, "@" + artist.youtubeChannelId, artist.createdAt, Icons.Default.Person) { onArtistClick(artist.id) }
+            }
+            2 -> recent.albums.forEach { album ->
+                RecentItemRow(album.title, album.artistName, album.createdAt, Icons.Default.Album) { }
+            }
+            3 -> recent.users.forEach { user ->
+                RecentItemRow(user.username, user.email, user.createdAt, Icons.Default.AccountCircle) { onUserClick(user.id) }
+            }
+            4 -> recent.playlists.forEach { playlist ->
+                RecentItemRow(playlist.name, if (playlist.isPublic) "Public" else "Private", playlist.createdAt, Icons.Default.PlaylistPlay) { }
+            }
+        }
+    }
+}
+
+@Composable
+fun RecentItemRow(title: String, subtitle: String, time: String, icon: ImageVector, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                onClick = onClick,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true)
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.White.copy(alpha = 0.05f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(Dimens.paddingNormal))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1)
+            Text(subtitle, color = Color.White.copy(alpha = 0.4f), fontSize = 11.sp, maxLines = 1)
+        }
+        Text(
+            text = time.substringBefore("T").replace("-", "/"), // Simple format
+            fontSize = 10.sp,
+            color = Color.White.copy(alpha = 0.2f)
+        )
     }
 }
 

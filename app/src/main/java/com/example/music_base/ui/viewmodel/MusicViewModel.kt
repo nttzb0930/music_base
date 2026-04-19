@@ -6,18 +6,24 @@ import androidx.lifecycle.viewModelScope
 import android.util.Log
 import com.example.music_base.data.model.*
 import com.example.music_base.data.repository.MusicRepository
+import com.example.music_base.data.repository.StashRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 
 class MusicViewModel(
-    private val repository: MusicRepository
+    private val repository: MusicRepository,
+    private val stashRepository: StashRepository
 ) : ViewModel() {
-    class Factory(private val repository: MusicRepository) : ViewModelProvider.Factory {
+    class Factory(
+        private val repository: MusicRepository,
+        private val stashRepository: StashRepository
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(MusicViewModel::class.java)) {
-                return MusicViewModel(repository) as T
+                return MusicViewModel(repository, stashRepository) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }
@@ -100,6 +106,21 @@ class MusicViewModel(
 
     private val _toastMessage = MutableSharedFlow<String>()
     val toastMessage = _toastMessage.asSharedFlow()
+
+    // --- Stash Dashboard State ---
+    private val _stashOverview = MutableStateFlow<StashOverview?>(null)
+    val stashOverview: StateFlow<StashOverview?> = _stashOverview.asStateFlow()
+
+    private val _stashRecent = MutableStateFlow<StashRecent?>(null)
+    val stashRecent: StateFlow<StashRecent?> = _stashRecent.asStateFlow()
+
+    private val _stashTopTracks = MutableStateFlow<StashTopTracks?>(null)
+    val stashTopTracks: StateFlow<StashTopTracks?> = _stashTopTracks.asStateFlow()
+
+    private val _isDashboardLoading = MutableStateFlow(false)
+    val isDashboardLoading: StateFlow<Boolean> = _isDashboardLoading.asStateFlow()
+
+    private var loadDashboardJob: Job? = null
 
     private val _playbackHistory = MutableStateFlow<List<PlaybackDateGroup>>(emptyList())
     val playbackHistory: StateFlow<List<PlaybackDateGroup>> = _playbackHistory.asStateFlow()
@@ -312,6 +333,37 @@ class MusicViewModel(
                 }
             )
             _isAdminLoading.value = false
+        }
+    }
+
+    fun loadStashDashboard() {
+        loadDashboardJob?.cancel()
+        loadDashboardJob = viewModelScope.launch {
+            _isDashboardLoading.value = true
+            
+            // Load all three components in parallel
+            val overviewJob = async { stashRepository.getOverview() }
+            val recentJob = async { stashRepository.getRecent(limit = 10) }
+            val topTracksJob = async { stashRepository.getTopTracks(limit = 10) }
+
+            val overviewRes = overviewJob.await()
+            val recentRes = recentJob.await()
+            val topTracksRes = topTracksJob.await()
+
+            overviewRes.fold(
+                onSuccess = { _stashOverview.value = it },
+                onFailure = { _toastMessage.emit("Overview error: ${it.message}") }
+            )
+            recentRes.fold(
+                onSuccess = { _stashRecent.value = it },
+                onFailure = { _toastMessage.emit("Recent error: ${it.message}") }
+            )
+            topTracksRes.fold(
+                onSuccess = { _stashTopTracks.value = it },
+                onFailure = { _toastMessage.emit("Top Tracks error: ${it.message}") }
+            )
+
+            _isDashboardLoading.value = false
         }
     }
 
