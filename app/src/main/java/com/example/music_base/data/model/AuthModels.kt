@@ -6,7 +6,9 @@ data class User(
     @SerializedName("id") val id: String? = null,
     @SerializedName("email") val email: String? = null,
     @SerializedName("username") val username: String? = null,
-    @SerializedName("role") val role: String? = null
+    @SerializedName("role") val role: String? = null,
+    @SerializedName("createdAt") val createdAt: String? = null,
+    @SerializedName("updatedAt") val updatedAt: String? = null
 ) {
     /**
      * Centralized role check to avoid hardcoded string comparisons across the app.
@@ -44,6 +46,17 @@ data class AuthResponse(
 
 data class RefreshRequest(
     @SerializedName("refresh_token") val refreshToken: String
+)
+
+data class UpdateProfileRequest(
+    val username: String?,
+    val email: String?
+)
+
+data class ChangePasswordRequest(
+    val oldPassword: String,
+    val newPassword: String,
+    val confirmNewPassword: String
 )
 
 data class MessageResponse(

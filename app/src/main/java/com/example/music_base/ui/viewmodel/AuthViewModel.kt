@@ -7,9 +7,12 @@ import com.example.music_base.data.model.LoginRequest
 import com.example.music_base.data.model.RegisterRequest
 import com.example.music_base.data.model.User
 import com.example.music_base.data.repository.AuthRepository
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -36,6 +39,12 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = null
         )
+    
+    private val _operationMessage = MutableSharedFlow<String>()
+    val operationMessage: SharedFlow<String> = _operationMessage.asSharedFlow()
+    
+    private val _isAccountOperationLoading = MutableStateFlow(false)
+    val isAccountOperationLoading: StateFlow<Boolean> = _isAccountOperationLoading.asStateFlow()
     
     val accessToken = repository.accessToken
 
@@ -87,6 +96,39 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
         viewModelScope.launch {
             repository.logout()
             _authState.value = AuthState.Unauthenticated
+        }
+    }
+
+    fun updateProfile(username: String?, email: String?) {
+        viewModelScope.launch {
+            _isAccountOperationLoading.value = true
+            val result = repository.updateProfile(username, email)
+            if (result.isSuccess) {
+                val updatedUser = result.getOrThrow()
+                _authState.value = AuthState.Authenticated(updatedUser)
+                _operationMessage.emit("Profile updated successfully")
+            } else {
+                _operationMessage.emit(result.exceptionOrNull()?.message ?: "Update failed")
+            }
+            _isAccountOperationLoading.value = false
+        }
+    }
+
+    fun changePassword(old: String, new: String, confirm: String) {
+        viewModelScope.launch {
+            if (new != confirm) {
+                _operationMessage.emit("Confirm password does not match")
+                return@launch
+            }
+            
+            _isAccountOperationLoading.value = true
+            val result = repository.changePassword(com.example.music_base.data.model.ChangePasswordRequest(old, new, confirm))
+            if (result.isSuccess) {
+                _operationMessage.emit("Password changed successfully")
+            } else {
+                _operationMessage.emit(result.exceptionOrNull()?.message ?: "Password change failed")
+            }
+            _isAccountOperationLoading.value = false
         }
     }
 

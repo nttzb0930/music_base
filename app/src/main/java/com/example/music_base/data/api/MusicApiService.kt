@@ -15,6 +15,15 @@ data class TrackLikeRequest(
     val trackId: String
 )
 
+data class UpdateTrackMetadataRequest(
+    val title: String? = null,
+    val description: String? = null,
+    val artistId: String? = null,
+    val albumId: String? = null,
+    val thumbnailUrl: String? = null,
+    val youtubeVideoId: String? = null
+)
+
 data class TrackLikeResponse(
     val liked: Boolean
 )
@@ -204,4 +213,30 @@ interface MusicApiService {
 
     @DELETE("playback/history")
     suspend fun clearHistory(): Response<MessageResponse>
+
+    // --- ADMIN TRACKS ---
+    @Multipart
+    @POST("tracks/admin/upload")
+    suspend fun adminUploadTrack(
+        @Part("title") title: okhttp3.RequestBody,
+        @Part("description") description: okhttp3.RequestBody?,
+        @Part("artistId") artistId: okhttp3.RequestBody,
+        @Part("albumId") albumId: okhttp3.RequestBody?,
+        @Part("thumbnailUrl") thumbnailUrl: okhttp3.RequestBody?,
+        @Part("youtubeVideoId") youtubeVideoId: okhttp3.RequestBody?,
+        @Part("sourceType") sourceType: okhttp3.RequestBody,
+        @Part("youtubeUrl") youtubeUrl: okhttp3.RequestBody?,
+        @Part file: okhttp3.MultipartBody.Part?
+    ): Response<Track>
+
+    @PATCH("tracks/admin/{trackId}")
+    suspend fun adminUpdateTrack(
+        @Path("trackId") trackId: String,
+        @Body request: UpdateTrackMetadataRequest
+    ): Response<Track>
+
+    @DELETE("tracks/admin/{trackId}")
+    suspend fun adminDeleteTrack(
+        @Path("trackId") trackId: String
+    ): Response<MessageResponse>
 }

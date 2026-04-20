@@ -62,6 +62,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import com.example.music_base.ui.screens.admin.AdminDashboardScreen
 import com.example.music_base.ui.screens.admin.*
+import okhttp3.MultipartBody
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -371,16 +372,24 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                                     },
                                     onUserClick = { id ->
                                         musicViewModel.setToastMessage("User profile view not implemented ($id)")
+                                    },
+                                    onUpdateTrack = { id, title, desc, artist, album, thumb, ytVid ->
+                                        musicViewModel.updateTrack(id, title, desc, artist, album, thumb, ytVid)
+                                    },
+                                    onDeleteTrack = { id ->
+                                        musicViewModel.deleteTrack(id)
+                                    },
+                                    onUploadTrack = { title, desc, artist, album, thumb, ytVid, source, ytUrl, file ->
+                                        musicViewModel.uploadTrack(title, desc, artist, album, thumb, ytVid, source, ytUrl, file)
                                     }
                                 )
                             }
                             AdminBottomNavItem.Ingest -> {
+                                val isAdminOperationLoading by musicViewModel.isAdminOperationLoading.collectAsState()
                                 AdminIngestScreen(
-                                    onUploadAudio = { title, artist ->
-                                        musicViewModel.uploadAudio(title, artist)
-                                    },
-                                    onSyncUrl = { url ->
-                                        musicViewModel.syncTrackFromUrl(url)
+                                    isAdminLoading = isAdminOperationLoading,
+                                    onUploadTrack = { title, desc, artist, album, thumb, ytVid, source, ytUrl, file ->
+                                        musicViewModel.uploadTrack(title, desc, artist, album, thumb, ytVid, source, ytUrl, file)
                                     }
                                 )
                             }

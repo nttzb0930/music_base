@@ -81,6 +81,24 @@ fun SettingsContent(
     modifier: Modifier = Modifier
 ) {
     val authState = viewModel.authState.collectAsState().value
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var showChangePasswordDialog by remember { mutableStateOf(false) }
+
+    // Dialogs
+    if (showEditProfileDialog && authState is AuthState.Authenticated) {
+        EditProfileDialog(
+            user = authState.user,
+            viewModel = viewModel,
+            onDismiss = { showEditProfileDialog = false }
+        )
+    }
+
+    if (showChangePasswordDialog) {
+        ChangePasswordDialog(
+            viewModel = viewModel,
+            onDismiss = { showChangePasswordDialog = false }
+        )
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -104,6 +122,7 @@ fun SettingsContent(
             }
         } else if (authState is AuthState.Authenticated) {
             val user = authState.user
+
             // Authenticated Settings
             item {
                 AuthProfileSection(user = user)
@@ -111,9 +130,28 @@ fun SettingsContent(
 
             item {
                 SettingSection(title = "Account") {
-                    SettingItem(icon = Icons.Rounded.Badge, title = "Username", value = user.displayName)
-                    SettingItem(icon = Icons.Rounded.Person, title = "Account details")
-                    SettingItem(icon = Icons.Rounded.Mail, title = "Email address", value = user.email)
+                    SettingItem(
+                        icon = Icons.Rounded.Badge, 
+                        title = "Username", 
+                        value = user.displayName,
+                        onClick = { showEditProfileDialog = true }
+                    )
+                    SettingItem(
+                        icon = Icons.Rounded.Person, 
+                        title = "Edit Profile Info",
+                        onClick = { showEditProfileDialog = true }
+                    )
+                    SettingItem(
+                        icon = Icons.Rounded.Mail, 
+                        title = "Email address", 
+                        value = user.email,
+                        onClick = { showEditProfileDialog = true }
+                    )
+                    SettingItem(
+                        icon = Icons.Rounded.Lock, 
+                        title = "Change Password",
+                        onClick = { showChangePasswordDialog = true }
+                    )
                 }
             }
         }
@@ -290,12 +328,13 @@ fun SettingItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     value: String? = null,
     showExternalIcon: Boolean = false,
-    hideIcon: Boolean = false
+    hideIcon: Boolean = false,
+    onClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -377,6 +416,162 @@ fun SettingToggle(
                 checkedTrackColor = Color(0xFF1DB954),
                 uncheckedThumbColor = Color.White.copy(alpha = 0.6f),
                 uncheckedTrackColor = Color(0xFF262626)
+            )
+        )
+    }
+}
+
+@Composable
+fun EditProfileDialog(
+    user: com.example.music_base.data.model.User,
+    viewModel: AuthViewModel,
+    onDismiss: () -> Unit
+) {
+    var username by remember { mutableStateOf(user.username ?: "") }
+    var email by remember { mutableStateOf(user.email ?: "") }
+    val isLoading by viewModel.isAccountOperationLoading.collectAsState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1A1A1A),
+        tonalElevation = 8.dp,
+        title = {
+            Text("Edit Profile", color = Color.White, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SettingsTextField(
+                    label = "Username",
+                    value = username,
+                    onValueChange = { username = it },
+                    placeholder = "Enter new username"
+                )
+                SettingsTextField(
+                    label = "Email Address",
+                    value = email,
+                    onValueChange = { email = it },
+                    placeholder = "Enter new email"
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    viewModel.updateProfile(username, email)
+                    onDismiss()
+                },
+                enabled = !isLoading && username.isNotBlank() && email.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1DB954))
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("Save Changes", color = Color(0xFF002A0C), fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+            }
+        }
+    )
+}
+
+@Composable
+fun ChangePasswordDialog(
+    viewModel: AuthViewModel,
+    onDismiss: () -> Unit
+) {
+    var oldPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    val isLoading by viewModel.isAccountOperationLoading.collectAsState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1A1A1A),
+        title = {
+            Text("Change Password", color = Color.White, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SettingsTextField(
+                    label = "Current Password",
+                    value = oldPassword,
+                    onValueChange = { oldPassword = it },
+                    isPassword = true
+                )
+                SettingsTextField(
+                    label = "New Password",
+                    value = newPassword,
+                    onValueChange = { newPassword = it },
+                    isPassword = true
+                )
+                SettingsTextField(
+                    label = "Confirm New Password",
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    isPassword = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    viewModel.changePassword(oldPassword, newPassword, confirmPassword)
+                    onDismiss()
+                },
+                enabled = !isLoading && oldPassword.isNotBlank() && newPassword.isNotBlank() && confirmPassword.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1DB954))
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("Update Password", color = Color(0xFF002A0C), fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+            }
+        }
+    )
+}
+
+@Composable
+fun SettingsTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String = "",
+    isPassword: Boolean = false
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = label,
+            color = Color(0xFF72FE8F),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text(placeholder, color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp) },
+            singleLine = true,
+            visualTransformation = if (isPassword) 
+                androidx.compose.ui.text.input.PasswordVisualTransformation() 
+                else androidx.compose.ui.text.input.VisualTransformation.None,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF1DB954),
+                unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                cursorColor = Color(0xFF1DB954),
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White
             )
         )
     }

@@ -116,4 +116,43 @@ class AuthRepository(
             Result.failure(e)
         }
     }
+
+    suspend fun getAllUsers(): Result<List<User>> {
+        return try {
+            val response = apiService.getAllUsers()
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception(getErrorMessage(response)))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateProfile(username: String?, email: String?): Result<User> {
+        return try {
+            val response = apiService.updateProfile(UpdateProfileRequest(username, email))
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception(getErrorMessage(response)))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun changePassword(request: ChangePasswordRequest): Result<MessageResponse> {
+        return try {
+            val response = apiService.changePassword(request)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception(getErrorMessage(response)))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

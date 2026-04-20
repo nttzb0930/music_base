@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import okhttp3.MultipartBody
 
 @Composable
 fun AdminDashboardScreen(
@@ -41,9 +42,33 @@ fun AdminDashboardScreen(
     onRefresh: () -> Unit,
     onTrackClick: (String) -> Unit,
     onArtistClick: (String) -> Unit,
-    onUserClick: (String) -> Unit
+    onUserClick: (String) -> Unit,
+    onUpdateTrack: (
+        id: String,
+        title: String?,
+        description: String?,
+        artistId: String?,
+        albumId: String?,
+        thumbnailUrl: String?,
+        youtubeVideoId: String?
+    ) -> Unit,
+    onDeleteTrack: (String) -> Unit,
+    onUploadTrack: (
+        title: String,
+        description: String?,
+        artistId: String,
+        albumId: String?,
+        thumbnailUrl: String?,
+        youtubeVideoId: String?,
+        sourceType: String,
+        youtubeUrl: String?,
+        file: MultipartBody.Part?
+    ) -> Unit
 ) {
     var selectedRecentTab by remember { mutableStateOf(0) }
+    var showUploadDialog by remember { mutableStateOf(false) }
+    var editingTrack by remember { mutableStateOf<StashTrackItem?>(null) }
+    
     val tabs = listOf("Tracks", "Artists", "Albums", "Users", "Playlists")
 
     LaunchedEffect(Unit) {
@@ -135,7 +160,17 @@ fun AdminDashboardScreen(
                             .padding(Dimens.paddingNormal)
                     ) {
                         AnimatedContent(targetState = selectedRecentTab, label = "recentTab") { tabIndex ->
-                            RecentContentList(tabIndex, recent, onTrackClick, onArtistClick, onUserClick)
+                            RecentContentList(
+                                tabIndex = tabIndex,
+                                recent = recent,
+                                onTrackClick = onTrackClick,
+                                onArtistClick = onArtistClick,
+                                onUserClick = onUserClick,
+                                onEditTrack = { track ->
+                                    editingTrack = track
+                                },
+                                onDeleteTrack = onDeleteTrack
+                            )
                         }
                     }
                 }
@@ -151,6 +186,43 @@ fun AdminDashboardScreen(
                     }
                 }
             }
+        }
+
+        // --- DASHBOARD FAB ---
+        FloatingActionButton(
+            onClick = { showUploadDialog = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 100.dp),
+            containerColor = Primary,
+            contentColor = Color.Black
+        ) {
+            Icon(Icons.Default.Add, "Upload Track")
+        }
+
+        // --- UPLOAD DIALOG ---
+        if (showUploadDialog) {
+            TrackFormDialog(
+                onDismiss = { showUploadDialog = false },
+                onConfirm = { title, desc, artist, album, thumb, ytVid, source, ytUrl, file ->
+                    onUploadTrack(title, desc, artist, album, thumb, ytVid, source, ytUrl, file)
+                    showUploadDialog = false
+                }
+            )
+        }
+
+        // --- EDIT DIALOG ---
+        editingTrack?.let { track ->
+            TrackFormDialog(
+                initialTitle = track.title,
+                initialArtistId = track.artistId,
+                isEditMode = true,
+                onDismiss = { editingTrack = null },
+                onConfirm = { title, desc, artist, album, thumb, ytVid, _, _, _ ->
+                    onUpdateTrack(track.id, title, desc, artist, album, thumb, ytVid)
+                    editingTrack = null
+                }
+            )
         }
         
         if (isLoading && overview == null) {
@@ -259,7 +331,7 @@ private fun StatisticsPanorama(overview: StashOverview) {
 
 @Composable
 fun TrackManagementItem(
-    track: Track,
+    track: StashTrackItem,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -273,7 +345,7 @@ fun TrackManagementItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = track.coverUrl,
+            model = "https://picsum.photos/200/200?random=${track.id}",
             contentDescription = null,
             modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Crop
@@ -281,7 +353,7 @@ fun TrackManagementItem(
         Spacer(Modifier.width(Dimens.paddingNormal))
         Column(Modifier.weight(1f)) {
             Text(track.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(track.artistName ?: "Unknown", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+            Text(track.artistName, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
         }
         Row {
             IconButton(onClick = onEdit) {
@@ -388,7 +460,9 @@ fun RecentContentList(
     recent: StashRecent?,
     onTrackClick: (String) -> Unit,
     onArtistClick: (String) -> Unit,
-    onUserClick: (String) -> Unit
+    onUserClick: (String) -> Unit,
+    onEditTrack: (StashTrackItem) -> Unit,
+    onDeleteTrack: (String) -> Unit
 ) {
     if (recent == null) {
         Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
@@ -400,7 +474,11 @@ fun RecentContentList(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when (tabIndex) {
             0 -> recent.tracks.forEach { track ->
-                RecentItemRow(track.title, track.artistName, track.createdAt, Icons.Default.MusicNote) { onTrackClick(track.id) }
+                TrackManagementItem(
+                    track = track,
+                    onEdit = { onEditTrack(track) },
+                    onDelete = { onDeleteTrack(track.id) }
+                )
             }
             1 -> recent.artists.forEach { artist ->
                 RecentItemRow(artist.name, "@" + artist.youtubeChannelId, artist.createdAt, Icons.Default.Person) { onArtistClick(artist.id) }

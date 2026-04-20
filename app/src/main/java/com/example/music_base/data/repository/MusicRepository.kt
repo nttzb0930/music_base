@@ -7,7 +7,10 @@ import com.example.music_base.data.api.TrackLikeResponse
 import com.example.music_base.data.model.*
 import com.example.music_base.data.model.MessageResponse
 import com.google.gson.Gson
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Response
+import android.util.Log
 
 class MusicRepository(private val apiService: MusicApiService) {
 
@@ -180,6 +183,62 @@ class MusicRepository(private val apiService: MusicApiService) {
 
     suspend fun clearHistory(): Result<MessageResponse> {
         return handleApi { apiService.clearHistory() }
+    }
+
+    // --- ADMIN TRACKS ---
+    suspend fun adminUploadTrack(
+        title: String,
+        description: String?,
+        artistId: String,
+        albumId: String?,
+        thumbnailUrl: String?,
+        youtubeVideoId: String?,
+        sourceType: String,
+        youtubeUrl: String?,
+        file: okhttp3.MultipartBody.Part?
+    ): Result<Track> {
+        val mediaType = "text/plain".toMediaTypeOrNull()
+        val titleRB = title.toRequestBody(mediaType)
+        val descRB = description?.toRequestBody(mediaType)
+        val artistRB = artistId.toRequestBody(mediaType)
+        val albumRB = albumId?.toRequestBody(mediaType)
+        val thumbRB = thumbnailUrl?.toRequestBody(mediaType)
+        val ytVidRB = youtubeVideoId?.toRequestBody(mediaType)
+        val sourceRB = sourceType.toRequestBody(mediaType)
+        val ytUrlRB = youtubeUrl?.toRequestBody(mediaType)
+
+        return handleApi {
+            val response = apiService.adminUploadTrack(
+                titleRB, descRB, artistRB, albumRB, thumbRB, ytVidRB, sourceRB, ytUrlRB, file
+            )
+            if (response.isSuccessful) {
+                Log.d("MusicRepository", "Upload success: ${response.code()}")
+            } else {
+                Log.e("MusicRepository", "Upload failed: ${response.code()} - ${response.errorBody()?.string()}")
+            }
+            response
+        }
+    }
+
+    suspend fun adminUpdateTrack(
+        trackId: String,
+        title: String?,
+        description: String?,
+        artistId: String?,
+        albumId: String?,
+        thumbnailUrl: String?,
+        youtubeVideoId: String?
+    ): Result<Track> {
+        return handleApi {
+            apiService.adminUpdateTrack(
+                trackId,
+                com.example.music_base.data.api.UpdateTrackMetadataRequest(title, description, artistId, albumId, thumbnailUrl, youtubeVideoId)
+            )
+        }
+    }
+
+    suspend fun adminDeleteTrack(trackId: String): Result<MessageResponse> {
+        return handleApi { apiService.adminDeleteTrack(trackId) }
     }
 
     private suspend fun <T> handleApi(call: suspend () -> Response<T>): Result<T> {

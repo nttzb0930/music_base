@@ -21,6 +21,15 @@ interface AuthApiService {
     @GET("users/me")
     suspend fun getMe(): Response<User>
 
+    @GET("users")
+    suspend fun getAllUsers(): Response<List<User>>
+
+    @PATCH("users/me")
+    suspend fun updateProfile(@Body request: UpdateProfileRequest): Response<User>
+
+    @PATCH("users/me/change-password")
+    suspend fun changePassword(@Body request: ChangePasswordRequest): Response<MessageResponse>
+
     companion object {
         const val BASE_URL = "https://api-music-player.up.railway.app/api/v1/"
     }

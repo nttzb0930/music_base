@@ -11,6 +11,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
+import okhttp3.MultipartBody
 
 class MusicViewModel(
     private val repository: MusicRepository,
@@ -49,6 +50,12 @@ class MusicViewModel(
 
     private val _artistTracks = MutableStateFlow<List<Track>>(emptyList())
     val artistTracks: StateFlow<List<Track>> = _artistTracks.asStateFlow()
+
+    private val _adminTrackOperation = MutableSharedFlow<Result<Any>>()
+    val adminTrackOperation = _adminTrackOperation.asSharedFlow()
+
+    private val _isAdminOperationLoading = MutableStateFlow(false)
+    val isAdminOperationLoading = _isAdminOperationLoading.asStateFlow()
 
     private val _isArtistDetailLoading = MutableStateFlow(false)
     val isArtistDetailLoading: StateFlow<Boolean> = _isArtistDetailLoading.asStateFlow()
@@ -367,11 +374,93 @@ class MusicViewModel(
         }
     }
 
+    fun uploadTrack(
+        title: String,
+        description: String?,
+        artistId: String,
+        albumId: String?,
+        thumbnailUrl: String?,
+        youtubeVideoId: String?,
+        sourceType: String,
+        youtubeUrl: String?,
+        file: MultipartBody.Part?
+    ) {
+        viewModelScope.launch {
+            Log.d("AdminOperation", "START uploadTrack: title=$title, source=$sourceType")
+            _isAdminOperationLoading.value = true
+            setToastMessage("Processing upload pipeline...")
+            
+            val result = repository.adminUploadTrack(
+                title, description, artistId, albumId, thumbnailUrl, youtubeVideoId, sourceType, youtubeUrl, file
+            )
+            
+            result.fold(
+                onSuccess = {
+                    setToastMessage("Success: Track deployed to system")
+                    loadStashDashboard()
+                },
+                onFailure = { error ->
+                    setToastMessage("Upload failed: ${error.message}")
+                }
+            )
+            
+            _isAdminOperationLoading.value = false
+        }
+    }
+
+    fun updateTrack(
+        trackId: String,
+        title: String?,
+        description: String?,
+        artistId: String?,
+        albumId: String?,
+        thumbnailUrl: String?,
+        youtubeVideoId: String?
+    ) {
+        viewModelScope.launch {
+            Log.d("AdminOperation", "START updateTrack: id=$trackId")
+            _isAdminOperationLoading.value = true
+            setToastMessage("Updating track metadata...")
+            
+            val result = repository.adminUpdateTrack(
+                trackId, title, description, artistId, albumId, thumbnailUrl, youtubeVideoId
+            )
+            
+            result.fold(
+                onSuccess = {
+                    setToastMessage("Success: Metadata synchronized")
+                    loadStashDashboard()
+                },
+                onFailure = { error ->
+                    setToastMessage("Update failed: ${error.message}")
+                }
+            )
+            
+            _isAdminOperationLoading.value = false
+        }
+    }
+
     fun deleteTrack(trackId: String) {
         viewModelScope.launch {
-            _toastMessage.emit("System: Track has been purged from repository")
-            _tracks.value = _tracks.value.filter { it.id != trackId }
-            _totalTrackCount.value = (_totalTrackCount.value - 1).coerceAtLeast(0)
+            Log.d("AdminOperation", "START deleteTrack: id=$trackId")
+            _isAdminOperationLoading.value = true
+            setToastMessage("Removing track from system...")
+            
+            val result = repository.adminDeleteTrack(trackId)
+            
+            result.fold(
+                onSuccess = {
+                    _tracks.value = _tracks.value.filter { it.id != trackId }
+                    _totalTrackCount.value = (_totalTrackCount.value - 1).coerceAtLeast(0)
+                    setToastMessage("Success: Track removed")
+                    loadStashDashboard()
+                },
+                onFailure = { error ->
+                    setToastMessage("Deletion failed: ${error.message}")
+                }
+            )
+            
+            _isAdminOperationLoading.value = false
         }
     }
 
@@ -934,14 +1023,17 @@ class MusicViewModel(
             _isSyncingFromUrl.value = true
             setToastMessage("Pulse Sync Initiated: Extracting metadata and sinking track...")
             
-            // Simulating API call to sync-url
-            kotlinx.coroutines.delay(3000)
-            
-            _isSyncingFromUrl.value = false
-            setToastMessage("Success: Track has been synchronized from YouTube")
-            
-            // Re-trigger search to pick up the new track
-            _searchQuery.value?.let { searchTracks(it) }
+            repository.syncTrackFromUrl(url).fold(
+                onSuccess = {
+                    _isSyncingFromUrl.value = false
+                    setToastMessage("Success: Track has been synchronized from YouTube")
+                    _searchQuery.value?.let { searchTracks(it) }
+                },
+                onFailure = {
+                    _isSyncingFromUrl.value = false
+                    setToastMessage("Sync failed: ${it.message}")
+                }
+            )
         }
     }
 
