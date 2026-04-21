@@ -13,7 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.*
@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.music_base.data.model.Track
 import com.example.music_base.ui.theme.Dimens
+import com.example.music_base.ui.theme.Primary
 import com.example.music_base.ui.viewmodel.MusicViewModel
 
 data class Category(val name: String, val color: Color)
@@ -39,6 +40,7 @@ data class Category(val name: String, val color: Color)
 fun SearchScreen(
     viewModel: MusicViewModel,
     onTrackClick: (Track) -> Unit,
+    onArtistClick: (com.example.music_base.data.model.Artist) -> Unit,
     onAddToPlaylist: (Track) -> Unit = {},
     onShare: (Track) -> Unit = {},
     modifier: Modifier = Modifier
@@ -46,7 +48,9 @@ fun SearchScreen(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
+    val artistResults by viewModel.artistSearchResults.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
+    val isSyncing by viewModel.isSyncingFromUrl.collectAsState()
 
     val categories = listOf(
         Category("Pop", Color(0xFFE91E63)),
@@ -66,6 +70,17 @@ fun SearchScreen(
     ) {
         var trackForMenu by remember { mutableStateOf<Track?>(null) }
         val likedTrackIds by viewModel.likedTrackIds.collectAsState()
+
+        // Refined logic: Only consider it a "match" if the query is actually found in the results
+        val hasActualMatches = remember(searchQuery, searchResults, artistResults) {
+            val query = searchQuery.trim()
+            if (query.isEmpty()) true 
+            else {
+                val trackMatch = searchResults.any { it.title.contains(query, ignoreCase = true) }
+                val artistMatch = artistResults.any { it.name.contains(query, ignoreCase = true) }
+                trackMatch || artistMatch
+            }
+        }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -117,23 +132,77 @@ fun SearchScreen(
                     }
                 }
             } else {
-                // Search results
-                if (searchResults.isEmpty() && !isSearching) {
-                    item {
-                        SearchPulseSyncModule(
-                            query = searchQuery,
-                            onSync = { url -> viewModel.syncTrackFromUrl(url) },
-                            isSyncing = viewModel.isSyncingFromUrl.collectAsState().value
-                        )
+                // Search results - Explicit states
+
+                when {
+                    isSearching -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+                        }
                     }
-                } else {
-                    items(searchResults) { track ->
-                        SearchTrackItem(
-                            track = track,
-                            onClick = { onTrackClick(track) },
-                            onMoreClick = { trackForMenu = track }
-                        )
+                    !hasActualMatches || (searchResults.isEmpty() && artistResults.isEmpty()) -> {
+                        item {
+                            EmptySearchResult(
+                                query = searchQuery,
+                                isSyncing = isSyncing,
+                                onSyncRequested = { url ->
+                                    viewModel.syncTrackFromUrl(url)
+                                }
+                            )
+                        }
                     }
+                    else -> {
+                    if (artistResults.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "Artists",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                            )
+                        }
+                        item {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp)
+                            ) {
+                                items(artistResults) { artist ->
+                                    ArtistSearchItem(artist) { onArtistClick(artist) }
+                                }
+                            }
+                        }
+                    }
+
+                    if (searchResults.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "Tracks",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                            )
+                        }
+                        items(searchResults) { track ->
+                            SearchTrackItem(
+                                track = track,
+                                onClick = { onTrackClick(track) },
+                                onMoreClick = { trackForMenu = track }
+                            )
+                        }
+                        }
+                }
                 }
             }
         }
@@ -259,29 +328,20 @@ fun CategoryCard(category: Category) {
     }
 }
 
+
+
 @Composable
-fun SearchPulseSyncModule(
-    query: String,
-    onSync: (String) -> Unit,
-    isSyncing: Boolean
+private fun EmptySearchResult(
+    query: String, 
+    isSyncing: Boolean,
+    onSyncRequested: (String) -> Unit
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
-    var url by remember { mutableStateOf("") }
-    
+    var isReportVisible by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 24.dp)
-            .animateContentSize()
-            .clip(RoundedCornerShape(Dimens.radiusLarge))
-            .background(Color.White.copy(alpha = 0.03f))
-            .border(
-                width = 1.dp,
-                color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(Dimens.radiusLarge)
-            )
-            .clickable { if (!isSyncing) isExpanded = !isExpanded }
-            .padding(Dimens.paddingLarge),
+            .padding(vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (isSyncing) {
@@ -292,75 +352,78 @@ fun SearchPulseSyncModule(
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "Pulse Syncing: Extracting discovery...",
+                "Sending report to admin...",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )
-            Text(
-                "This usually takes 30-60 seconds",
-                color = Color.White.copy(alpha = 0.5f),
-                fontSize = 12.sp
-            )
         } else {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text = "No results for \"$query\"",
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Medium
-                )
-            }
-            
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = Color.White.copy(alpha = 0.2f)
+            )
+            Spacer(Modifier.height(16.dp))
             Text(
-                text = "Don't see your track? Pulse Sync from YouTube",
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                modifier = Modifier.padding(top = 8.dp)
+                text = "No results found for \"$query\"",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.6f)
             )
             
-            if (isExpanded) {
-                Spacer(Modifier.height(24.dp))
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text("Paste YouTube Link") },
-                    placeholder = { Text("https://youtube.com/watch?v=...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f)
-                    ),
-                    shape = RoundedCornerShape(Dimens.radiusMedium)
-                )
-                
-                Spacer(Modifier.height(16.dp))
-                
-                Button(
-                    onClick = { 
-                        if (url.isNotBlank()) {
-                            onSync(url)
-                            isExpanded = false
-                            url = ""
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    shape = RoundedCornerShape(Dimens.radiusMedium)
+            Spacer(Modifier.height(Dimens.paddingLarge))
+
+            if (!isReportVisible) {
+                OutlinedButton(
+                    onClick = { isReportVisible = true },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Primary),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Primary.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(Dimens.radiusPill)
                 ) {
-                    Text("Sync Now", color = Color.Black, fontWeight = FontWeight.Black)
+                    Icon(Icons.Default.Flag, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Report to Admin & Sync", fontWeight = FontWeight.Bold)
                 }
             }
+
+            AnimatedVisibility(
+                visible = isReportVisible,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                com.example.music_base.ui.components.PulseSyncCard(onSyncRequested = {
+                    onSyncRequested(it)
+                    isReportVisible = false
+                })
+            }
         }
+    }
+}
+
+@Composable
+fun ArtistSearchItem(artist: com.example.music_base.data.model.Artist, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(100.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AsyncImage(
+            model = artist.imageUrl,
+            contentDescription = artist.name,
+            modifier = Modifier
+                .size(100.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = artist.name,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

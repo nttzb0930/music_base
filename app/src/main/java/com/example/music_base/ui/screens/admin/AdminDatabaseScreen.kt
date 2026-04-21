@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,22 +20,42 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import android.content.ClipboardManager
+import android.content.ClipData
+import android.content.Context
 import coil.compose.AsyncImage
 import com.example.music_base.data.model.Track
 import com.example.music_base.ui.theme.Dimens
 import com.example.music_base.ui.theme.Primary
 
+enum class AdminDatabaseTab { Tracks, Artists }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminDatabaseScreen(
+    // Tracks
     tracks: List<Track>,
-    isLoading: Boolean,
-    onLoadMore: () -> Unit,
-    onSearch: (String) -> Unit,
+    isTracksLoading: Boolean,
+    onLoadMoreTracks: () -> Unit,
+    onSearchTracks: (String) -> Unit,
     onEditTrack: (Track) -> Unit,
     onDeleteTrack: (Track) -> Unit,
+    
+    // Artists
+    artists: List<com.example.music_base.data.model.Artist>,
+    totalArtistCount: Int,
+    isArtistsLoading: Boolean,
+    onLoadMoreArtists: () -> Unit,
+    onCreateArtist: (name: String, channelId: String, uploaderId: String?, description: String?, thumbnails: List<String>?) -> Unit,
+    onUpdateArtist: (id: String, name: String?, channelId: String?, uploaderId: String?, description: String?, thumbnails: List<String>?) -> Unit,
+    onDeleteArtist: (String) -> Unit,
+    onSyncArtist: (String) -> Unit,
+    
     onRefresh: () -> Unit
 ) {
+    var selectedTab by remember { mutableStateOf(AdminDatabaseTab.Tracks) }
     var searchQuery by remember { mutableStateOf("") }
 
     Column(
@@ -42,53 +63,128 @@ fun AdminDatabaseScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // --- Search & Filter Bar ---
+        // --- Header Section ---
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
             tonalElevation = 2.dp
         ) {
-            Column(modifier = Modifier.padding(Dimens.paddingLarge)) {
+            Column(modifier = Modifier.padding(top = Dimens.paddingLarge, start = Dimens.paddingLarge, end = Dimens.paddingLarge)) {
                 Text(
-                    text = "Track Repository",
+                    text = "Master Repository",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Spacer(modifier = Modifier.height(Dimens.paddingNormal))
                 
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { 
-                        searchQuery = it
-                        onSearch(it)
+                Spacer(modifier = Modifier.height(Dimens.paddingSmall))
+
+                TabRow(
+                    selectedTabIndex = selectedTab.ordinal,
+                    containerColor = Color.Transparent,
+                    contentColor = Primary,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTab.ordinal]),
+                            color = Primary
+                        )
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search by title or artist...", color = Color.White.copy(alpha = 0.4f)) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, tint = Primary) },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = ""; onSearch("") }) {
-                                Icon(Icons.Default.Close, null, tint = Color.White.copy(alpha = 0.4f))
+                    divider = {}
+                ) {
+                    AdminDatabaseTab.values().forEach { tab ->
+                        Tab(
+                            selected = selectedTab == tab,
+                            onClick = { 
+                                selectedTab = tab 
+                                searchQuery = "" // Reset search when switching
+                            },
+                            text = {
+                                Text(
+                                    tab.name,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal
+                                )
                             }
-                        }
-                    },
-                    colors = TextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.White.copy(alpha = 0.1f),
-                        focusedIndicatorColor = Primary,
-                        cursorColor = Primary,
-                        unfocusedTextColor = Color.White,
-                        focusedTextColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(Dimens.radiusMedium),
-                    singleLine = true
-                )
+                        )
+                    }
+                }
             }
         }
 
-        // --- Tracks List ---
+        // --- Tab Content ---
+        when (selectedTab) {
+            AdminDatabaseTab.Tracks -> {
+                TracksTabContent(
+                    tracks = tracks,
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { 
+                        searchQuery = it
+                        onSearchTracks(it)
+                    },
+                    isLoading = isTracksLoading,
+                    onLoadMore = onLoadMoreTracks,
+                    onEditTrack = onEditTrack,
+                    onDeleteTrack = onDeleteTrack
+                )
+            }
+            AdminDatabaseTab.Artists -> {
+                // Reuse AdminArtistScreen logic or embed it
+                AdminArtistScreen(
+                    artists = artists,
+                    totalCount = totalArtistCount,
+                    isLoading = isArtistsLoading,
+                    onLoadMore = onLoadMoreArtists,
+                    onCreateArtist = onCreateArtist,
+                    onUpdateArtist = onUpdateArtist,
+                    onDeleteArtist = onDeleteArtist,
+                    onSyncArtist = onSyncArtist,
+                    onRefresh = onRefresh
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TracksTabContent(
+    tracks: List<Track>,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    isLoading: Boolean,
+    onLoadMore: () -> Unit,
+    onEditTrack: (Track) -> Unit,
+    onDeleteTrack: (Track) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Search bar for tracks
+        Box(modifier = Modifier.padding(Dimens.paddingLarge)) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Search by title or artist...", color = Color.White.copy(alpha = 0.4f)) },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = Primary) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchQueryChange("") }) {
+                            Icon(Icons.Default.Close, null, tint = Color.White.copy(alpha = 0.4f))
+                        }
+                    }
+                },
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.03f),
+                    focusedContainerColor = Color.White.copy(alpha = 0.05f),
+                    unfocusedIndicatorColor = Color.White.copy(alpha = 0.1f),
+                    focusedIndicatorColor = Primary,
+                    cursorColor = Primary,
+                    unfocusedTextColor = Color.White,
+                    focusedTextColor = Color.White
+                ),
+                shape = RoundedCornerShape(Dimens.radiusMedium),
+                singleLine = true
+            )
+        }
+
         if (isLoading && tracks.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Primary)
@@ -104,7 +200,7 @@ fun AdminDatabaseScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(Dimens.paddingLarge)
+                contentPadding = PaddingValues(horizontal = Dimens.paddingLarge, vertical = Dimens.paddingSmall)
             ) {
                 items(tracks) { track ->
                     DatabaseTrackItem(
@@ -131,9 +227,7 @@ fun AdminDatabaseScreen(
                         }
                     }
                 }
-                
-                // Extra padding for bottom navigation
-                item { Spacer(modifier = Modifier.height(100.dp)) }
+                item { Spacer(modifier = Modifier.height(120.dp)) }
             }
         }
     }
@@ -167,6 +261,14 @@ fun DatabaseTrackItem(
             Spacer(modifier = Modifier.width(Dimens.paddingNormal))
             
             Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = track.id,
+                    color = Primary.copy(alpha = 0.8f),
+                    fontSize = 10.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    maxLines = 1,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
                 Text(
                     text = track.title,
                     color = Color.White,

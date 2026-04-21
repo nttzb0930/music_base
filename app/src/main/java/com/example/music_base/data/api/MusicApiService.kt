@@ -24,6 +24,22 @@ data class UpdateTrackMetadataRequest(
     val youtubeVideoId: String? = null
 )
 
+data class CreateArtistRequest(
+    val name: String,
+    val youtubeChannelId: String,
+    val uploaderId: String? = null,
+    val description: String? = null,
+    val thumbnails: List<String>? = null
+)
+
+data class UpdateArtistRequest(
+    val name: String? = null,
+    val youtubeChannelId: String? = null,
+    val uploaderId: String? = null,
+    val description: String? = null,
+    val thumbnails: List<String>? = null
+)
+
 data class TrackLikeResponse(
     val liked: Boolean
 )
@@ -85,7 +101,8 @@ interface MusicApiService {
     @GET("artists")
     suspend fun getArtists(
         @Query("page") page: Int = 1,
-        @Query("limit") limit: Int = 20
+        @Query("limit") limit: Int = 20,
+        @Query("q") query: String? = null
     ): Response<PaginatedResponse<Artist>>
 
     @GET("artists/{id}")
@@ -101,6 +118,22 @@ interface MusicApiService {
     @POST("artists/sync")
     suspend fun syncArtist(
         @Body request: Map<String, Any>
+    ): Response<MessageResponse>
+
+    @POST("artists")
+    suspend fun createArtist(
+        @Body request: CreateArtistRequest
+    ): Response<Artist>
+
+    @PATCH("artists/{id}")
+    suspend fun updateArtist(
+        @Path("id") id: String,
+        @Body request: UpdateArtistRequest
+    ): Response<Artist>
+
+    @DELETE("artists/{id}")
+    suspend fun deleteArtist(
+        @Path("id") id: String
     ): Response<MessageResponse>
 
     @POST("tracks/sync-url")

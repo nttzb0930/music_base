@@ -58,6 +58,7 @@ import com.example.music_base.ui.screens.library.LibraryScreen
 import com.example.music_base.ui.screens.library.LikedTracksScreen
 import com.example.music_base.ui.components.SonicToast
 import com.example.music_base.ui.components.ToastType
+import com.example.music_base.ui.screens.admin.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import com.example.music_base.ui.screens.admin.AdminDashboardScreen
@@ -339,6 +340,9 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
             Box(Modifier.fillMaxSize().padding(paddingValues)) {
                 if (isAdminModeActive && currentUser?.isAdmin == true) {
                     // --- ADMIN MODE CONTENT ---
+                    var editingTrack by remember { mutableStateOf<com.example.music_base.data.model.Track?>(null) }
+                    var deletingTrack by remember { mutableStateOf<com.example.music_base.data.model.Track?>(null) }
+
                     AnimatedContent(
                         targetState = selectedAdminItem,
                         label = "adminNavTransition"
@@ -358,38 +362,33 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                                     onRefresh = { musicViewModel.loadStashDashboard() },
                                     onTrackClick = { id -> 
                                         scope.launch {
-                                            val detail = musicViewModel.fetchTrackDetail(id)
-                                            if (detail != null) {
-                                                MusicPlayerManager.setQueue(listOf(detail), 0)
+                                            val fullTrack = musicViewModel.fetchTrackDetail(id)
+                                            if (fullTrack != null && !fullTrack.audioUrl.isNullOrBlank()) {
+                                                MusicPlayerManager.setQueue(listOf(fullTrack), 0)
                                                 showPlayer = true
+                                            } else {
+                                                Toast.makeText(context, "Playback failed: Invalid track data", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     },
                                     onArtistClick = { id ->
-                                        openedArtist = Artist(id, "Loading...", "", "", null, null, "", "") // Dummy for now
+                                        openedArtist = com.example.music_base.data.model.Artist(id, "Loading...", "", "", null, null, "", "") // Dummy for now
                                         musicViewModel.getArtistTracks(id)
                                         showArtistDetail = true
                                     },
                                     onUserClick = { id ->
                                         musicViewModel.setToastMessage("User profile view not implemented ($id)")
-                                    },
-                                    onUpdateTrack = { id, title, desc, artist, album, thumb, ytVid ->
-                                        musicViewModel.updateTrack(id, title, desc, artist, album, thumb, ytVid)
-                                    },
-                                    onDeleteTrack = { id ->
-                                        musicViewModel.deleteTrack(id)
-                                    },
-                                    onUploadTrack = { title, desc, artist, album, thumb, ytVid, source, ytUrl, file ->
-                                        musicViewModel.uploadTrack(title, desc, artist, album, thumb, ytVid, source, ytUrl, file)
                                     }
                                 )
                             }
                             AdminBottomNavItem.Ingest -> {
                                 val isAdminOperationLoading by musicViewModel.isAdminOperationLoading.collectAsState()
+                                val artists by musicViewModel.adminArtists.collectAsState()
                                 AdminIngestScreen(
                                     isAdminLoading = isAdminOperationLoading,
-                                    onUploadTrack = { title, desc, artist, album, thumb, ytVid, source, ytUrl, file ->
-                                        musicViewModel.uploadTrack(title, desc, artist, album, thumb, ytVid, source, ytUrl, file)
+                                    artists = artists,
+                                    onUploadTrack = { title: String, desc: String?, art: String, alb: String?, thumb: String?, ytVid: String?, type: String, ytUrl: String?, file: okhttp3.MultipartBody.Part? ->
+                                        musicViewModel.uploadTrack(title, desc, art, alb, thumb, ytVid, type, ytUrl, file)
                                     }
                                 )
                             }
@@ -397,23 +396,85 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                                 val allTracks by musicViewModel.tracks.collectAsState()
                                 val isAdminLoading by musicViewModel.isAdminLoading.collectAsState()
                                 
+                                val artists by musicViewModel.adminArtists.collectAsState()
+                                val totalArtistCount by musicViewModel.totalArtistCount.collectAsState()
+                                val isAdminArtistsLoading by musicViewModel.isAdminArtistsLoading.collectAsState()
+
                                 LaunchedEffect(Unit) {
                                     if (allTracks.isEmpty()) {
                                         musicViewModel.loadAdminTracks(isRefresh = true)
                                     }
+                                    if (artists.isEmpty()) {
+                                        musicViewModel.loadAdminArtists(isRefresh = true)
+                                    }
                                 }
 
                                 AdminDatabaseScreen(
+                                    // Tracks
                                     tracks = allTracks,
-                                    isLoading = isAdminLoading,
-                                    onLoadMore = { musicViewModel.loadAdminTracks() },
-                                    onSearch = { query -> musicViewModel.loadAdminTracks(isRefresh = true, query = query) },
-                                    onEditTrack = { track -> musicViewModel.updateTrackMock(track) },
-                                    onDeleteTrack = { track -> musicViewModel.deleteTrack(track.id) },
-                                    onRefresh = { musicViewModel.loadAdminTracks(isRefresh = true) }
+                                    isTracksLoading = isAdminLoading,
+                                    onLoadMoreTracks = { musicViewModel.loadAdminTracks() },
+                                    onSearchTracks = { query -> musicViewModel.loadAdminTracks(isRefresh = true, query = query) },
+                                    onEditTrack = { track -> editingTrack = track },
+                                    onDeleteTrack = { track -> deletingTrack = track },
+                                    
+                                    // Artists
+                                    artists = artists,
+                                    totalArtistCount = totalArtistCount,
+                                    isArtistsLoading = isAdminArtistsLoading,
+                                    onLoadMoreArtists = { musicViewModel.loadAdminArtists() },
+                                    onCreateArtist = { name, channelId, uploaderId, desc, thumbs ->
+                                        musicViewModel.createArtist(name, channelId, uploaderId, desc, thumbs)
+                                    },
+                                    onUpdateArtist = { id, name, channelId, uploaderId, desc, thumbs ->
+                                        musicViewModel.updateArtist(id, name, channelId, uploaderId, desc, thumbs)
+                                    },
+                                    onDeleteArtist = { id ->
+                                        musicViewModel.deleteArtist(id)
+                                    },
+                                    onSyncArtist = { _ -> 
+                                        musicViewModel.loadAdminArtists(isRefresh = true)
+                                        musicViewModel.setToastMessage("Repository Refreshed")
+                                    },
+                                    
+                                    onRefresh = { 
+                                        musicViewModel.loadAdminTracks(isRefresh = true)
+                                        musicViewModel.loadAdminArtists(isRefresh = true)
+                                    }
                                 )
                             }
                         }
+                    }
+
+                    // --- GLOBAL ADMIN DIALOGS ---
+                    deletingTrack?.let { track ->
+                        TrackDeleteConfirmDialog(
+                            trackTitle = track.title,
+                            onDismiss = { deletingTrack = null },
+                            onConfirm = {
+                                musicViewModel.deleteTrack(track.id)
+                                deletingTrack = null
+                            }
+                        )
+                    }
+
+                    editingTrack?.let { track ->
+                        val artists by musicViewModel.adminArtists.collectAsState()
+                        TrackFormDialog(
+                            initialTitle = track.title,
+                            initialDescription = track.description ?: "",
+                            initialArtistId = track.artistId,
+                            initialAlbumId = track.albumId ?: "",
+                            initialThumbnailUrl = track.coverUrl,
+                            initialYoutubeVideoId = track.youtubeVideoId ?: "",
+                            isEditMode = true,
+                            artists = artists,
+                            onDismiss = { editingTrack = null },
+                            onConfirm = { title, desc, artist, album, thumb, ytVid, _, _, _ ->
+                                musicViewModel.updateTrack(track.id, title, desc, artist, album, thumb, ytVid)
+                                editingTrack = null
+                            }
+                        )
                     }
                 } else {
                     // --- LISTENER MODE CONTENT ---
@@ -510,6 +571,11 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                                         Toast.makeText(context, "Cannot play: Missing audio URL", Toast.LENGTH_SHORT).show()
                                     }
                                 }
+                            },
+                            onArtistClick = { artist ->
+                                openedArtist = artist
+                                musicViewModel.getArtistTracks(artist.id)
+                                showArtistDetail = true
                             },
                             onAddToPlaylist = onAddToPlaylistGlobal,
                             onShare = onShareGlobal
@@ -939,6 +1005,7 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                 modifier = Modifier.pointerInput(Unit) { },
                 onBackClick = { showSettings = false },
                 viewModel = authViewModel,
+                musicViewModel = musicViewModel,
                 onNavigateToLogin = {
                     showSettings = false
                     profileInitialSubScreen = ProfileSubScreen.Login

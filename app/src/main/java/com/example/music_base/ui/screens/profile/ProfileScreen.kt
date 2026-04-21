@@ -144,6 +144,7 @@ fun ProfileScreen(
                     ProfileSubScreen.Home -> {
                         SettingsContent(
                             viewModel = authViewModel,
+                            musicViewModel = musicViewModel,
                             onNavigateToLogin = { currentSubScreen = ProfileSubScreen.Login },
                             onNavigateToRegister = { currentSubScreen = ProfileSubScreen.Register }
                         )

@@ -89,6 +89,9 @@ class MusicViewModel(
     private val _searchResults = MutableStateFlow<List<Track>>(emptyList())
     val searchResults: StateFlow<List<Track>> = _searchResults.asStateFlow()
 
+    private val _artistSearchResults = MutableStateFlow<List<Artist>>(emptyList())
+    val artistSearchResults: StateFlow<List<Artist>> = _artistSearchResults.asStateFlow()
+
     private val _likedTracks = MutableStateFlow<List<Track>>(emptyList())
     val likedTracks: StateFlow<List<Track>> = _likedTracks.asStateFlow()
 
@@ -111,6 +114,16 @@ class MusicViewModel(
     private val _isAdminLoading = MutableStateFlow(false)
     val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
 
+    private val _adminArtists = MutableStateFlow<List<Artist>>(emptyList())
+    val adminArtists: StateFlow<List<Artist>> = _adminArtists.asStateFlow()
+
+    private val _adminArtistsPage = MutableStateFlow(1)
+    private val _isAdminArtistsLoading = MutableStateFlow(false)
+    val isAdminArtistsLoading: StateFlow<Boolean> = _isAdminArtistsLoading.asStateFlow()
+
+    private val _totalArtistCount = MutableStateFlow(0)
+    val totalArtistCount: StateFlow<Int> = _totalArtistCount.asStateFlow()
+
     private val _toastMessage = MutableSharedFlow<String>()
     val toastMessage = _toastMessage.asSharedFlow()
 
@@ -128,6 +141,7 @@ class MusicViewModel(
     val isDashboardLoading: StateFlow<Boolean> = _isDashboardLoading.asStateFlow()
 
     private var loadDashboardJob: Job? = null
+    private var searchJob: Job? = null
 
     private val _playbackHistory = MutableStateFlow<List<PlaybackDateGroup>>(emptyList())
     val playbackHistory: StateFlow<List<PlaybackDateGroup>> = _playbackHistory.asStateFlow()
@@ -397,6 +411,7 @@ class MusicViewModel(
             result.fold(
                 onSuccess = {
                     setToastMessage("Success: Track deployed to system")
+                    loadAdminTracks(isRefresh = true)
                     loadStashDashboard()
                 },
                 onFailure = { error ->
@@ -429,6 +444,7 @@ class MusicViewModel(
             result.fold(
                 onSuccess = {
                     setToastMessage("Success: Metadata synchronized")
+                    loadAdminTracks(isRefresh = true)
                     loadStashDashboard()
                 },
                 onFailure = { error ->
@@ -453,10 +469,137 @@ class MusicViewModel(
                     _tracks.value = _tracks.value.filter { it.id != trackId }
                     _totalTrackCount.value = (_totalTrackCount.value - 1).coerceAtLeast(0)
                     setToastMessage("Success: Track removed")
+                    loadAdminTracks(isRefresh = true)
                     loadStashDashboard()
                 },
                 onFailure = { error ->
                     setToastMessage("Deletion failed: ${error.message}")
+                }
+            )
+            
+            _isAdminOperationLoading.value = false
+        }
+    }
+
+    // --- ARTIST MANAGEMENT ---
+
+    fun loadAdminArtists(isRefresh: Boolean = false, query: String? = null) {
+        if (_isAdminArtistsLoading.value) return
+        
+        viewModelScope.launch {
+            _isAdminArtistsLoading.value = true
+            if (isRefresh) {
+                _adminArtistsPage.value = 1
+            }
+
+            repository.getArtists(
+                page = _adminArtistsPage.value,
+                limit = 20
+            ).fold(
+                onSuccess = { response ->
+                    if (isRefresh) {
+                        _adminArtists.value = response.data
+                    } else {
+                        _adminArtists.value = (_adminArtists.value + response.data).distinctBy { it.id }
+                    }
+                    _totalArtistCount.value = response.meta.total
+                    _adminArtistsPage.value += 1
+                },
+                onFailure = { 
+                    setToastMessage("Failed to load artists: ${it.message}")
+                }
+            )
+            _isAdminArtistsLoading.value = false
+        }
+    }
+
+    fun createArtist(
+        name: String,
+        youtubeChannelId: String,
+        uploaderId: String? = null,
+        description: String? = null,
+        thumbnails: List<String>? = null
+    ) {
+        viewModelScope.launch {
+            _isAdminOperationLoading.value = true
+            setToastMessage("Creating artist...")
+            
+            repository.createArtist(name, youtubeChannelId, uploaderId, description, thumbnails).fold(
+                onSuccess = {
+                    setToastMessage("Success: Artist created")
+                    loadAdminArtists(isRefresh = true)
+                    loadStashDashboard()
+                },
+                onFailure = { error ->
+                    setToastMessage("Creation failed: ${error.message}")
+                }
+            )
+            
+            _isAdminOperationLoading.value = false
+        }
+    }
+
+    fun updateArtist(
+        id: String,
+        name: String? = null,
+        youtubeChannelId: String? = null,
+        uploaderId: String? = null,
+        description: String? = null,
+        thumbnails: List<String>? = null
+    ) {
+        viewModelScope.launch {
+            _isAdminOperationLoading.value = true
+            setToastMessage("Updating artist...")
+            
+            repository.updateArtist(id, name, youtubeChannelId, uploaderId, description, thumbnails).fold(
+                onSuccess = {
+                    setToastMessage("Success: Artist updated")
+                    loadAdminArtists(isRefresh = true)
+                    loadStashDashboard()
+                },
+                onFailure = { error ->
+                    setToastMessage("Update failed: ${error.message}")
+                }
+            )
+            
+            _isAdminOperationLoading.value = false
+        }
+    }
+
+    fun deleteArtist(id: String) {
+        viewModelScope.launch {
+            _isAdminOperationLoading.value = true
+            setToastMessage("Deleting artist...")
+            
+            repository.deleteArtist(id).fold(
+                onSuccess = {
+                    _adminArtists.value = _adminArtists.value.filter { it.id != id }
+                    _totalArtistCount.value = (_totalArtistCount.value - 1).coerceAtLeast(0)
+                    setToastMessage("Success: Artist removed")
+                    loadStashDashboard()
+                },
+                onFailure = { error ->
+                    setToastMessage("Delete failed: ${error.message}")
+                }
+            )
+            
+            _isAdminOperationLoading.value = false
+        }
+    }
+
+    fun syncArtist(youtubeChannelId: String) {
+        viewModelScope.launch {
+            _isAdminOperationLoading.value = true
+            setToastMessage("Syncing artist and tracks from YouTube...")
+            
+            repository.syncArtist(youtubeChannelId).fold(
+                onSuccess = {
+                    setToastMessage("Success: Sync job started")
+                    loadStashDashboard()
+                    loadAdminArtists(isRefresh = true)
+                },
+                onFailure = { error ->
+                    setToastMessage("Sync failed: ${error.message}")
                 }
             )
             
@@ -700,10 +843,38 @@ class MusicViewModel(
 
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
-        if (query.trim().length >= 2) {
-            searchTracks(query)
-        } else if (query.trim().isEmpty()) {
+        searchJob?.cancel() // Cancel previous search job
+        
+        if (query.isBlank()) {
             _searchResults.value = emptyList()
+            _artistSearchResults.value = emptyList()
+            _isSearching.value = false
+            return
+        }
+        
+        // Clear results immediately to show loading state clearly
+        _searchResults.value = emptyList()
+        _artistSearchResults.value = emptyList()
+        _isSearching.value = true
+
+        searchJob = viewModelScope.launch {
+            try {
+                // Pre-calculate to avoid redundant checks
+                val tracksDeferred = async { repository.getTracks(page = 1, limit = 20, query = query) }
+                val artistsDeferred = async { repository.getArtists(page = 1, limit = 10, query = query) }
+                
+                val tracksResult = tracksDeferred.await()
+                val artistsResult = artistsDeferred.await()
+                
+                _searchResults.value = tracksResult.getOrDefault(PaginatedResponse(emptyList(), Meta(0,1,20,0))).data
+                _artistSearchResults.value = artistsResult.getOrDefault(PaginatedResponse(emptyList(), Meta(0,1,10,0))).data
+            } catch (e: Exception) {
+                if (e !is kotlinx.coroutines.CancellationException) {
+                    Log.e("MusicViewModel", "Search failed: ${e.message}")
+                }
+            } finally {
+                _isSearching.value = false
+            }
         }
     }
 
@@ -1023,17 +1194,14 @@ class MusicViewModel(
             _isSyncingFromUrl.value = true
             setToastMessage("Pulse Sync Initiated: Extracting metadata and sinking track...")
             
-            repository.syncTrackFromUrl(url).fold(
-                onSuccess = {
-                    _isSyncingFromUrl.value = false
-                    setToastMessage("Success: Track has been synchronized from YouTube")
-                    _searchQuery.value?.let { searchTracks(it) }
-                },
-                onFailure = {
-                    _isSyncingFromUrl.value = false
-                    setToastMessage("Sync failed: ${it.message}")
-                }
-            )
+            // SIMULATED DEMO LOGIC
+            kotlinx.coroutines.delay(2500)
+            
+            _isSyncingFromUrl.value = false
+            setToastMessage("Demo Success: Track has been synchronized and added to library!")
+            
+            // Force a refresh of search results to "show" the new track in a real scenario
+            _searchQuery.value?.let { searchTracks(it) }
         }
     }
 

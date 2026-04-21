@@ -42,33 +42,10 @@ fun AdminDashboardScreen(
     onRefresh: () -> Unit,
     onTrackClick: (String) -> Unit,
     onArtistClick: (String) -> Unit,
-    onUserClick: (String) -> Unit,
-    onUpdateTrack: (
-        id: String,
-        title: String?,
-        description: String?,
-        artistId: String?,
-        albumId: String?,
-        thumbnailUrl: String?,
-        youtubeVideoId: String?
-    ) -> Unit,
-    onDeleteTrack: (String) -> Unit,
-    onUploadTrack: (
-        title: String,
-        description: String?,
-        artistId: String,
-        albumId: String?,
-        thumbnailUrl: String?,
-        youtubeVideoId: String?,
-        sourceType: String,
-        youtubeUrl: String?,
-        file: MultipartBody.Part?
-    ) -> Unit
+    onUserClick: (String) -> Unit
 ) {
     var selectedRecentTab by remember { mutableStateOf(0) }
-    var showUploadDialog by remember { mutableStateOf(false) }
-    var editingTrack by remember { mutableStateOf<StashTrackItem?>(null) }
-    
+
     val tabs = listOf("Tracks", "Artists", "Albums", "Users", "Playlists")
 
     LaunchedEffect(Unit) {
@@ -116,25 +93,26 @@ fun AdminDashboardScreen(
                 }
             }
 
-            // --- Recent Activity Center ---
+            // --- Real-time Activity Feed ---
             item {
-                Column {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "Real-time Activity",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.padding(bottom = Dimens.paddingSmall)
+                        color = Color.White
                     )
+                    
+                    Spacer(modifier = Modifier.height(Dimens.paddingNormal))
                     
                     ScrollableTabRow(
                         selectedTabIndex = selectedRecentTab,
                         containerColor = Color.Transparent,
                         contentColor = Primary,
-                        edgePadding = 0.dp,
                         divider = {},
+                        edgePadding = 0.dp,
                         indicator = { tabPositions ->
-                            TabRowDefaults.Indicator(
+                            TabRowDefaults.SecondaryIndicator(
                                 modifier = Modifier.tabIndicatorOffset(tabPositions[selectedRecentTab]),
                                 color = Primary
                             )
@@ -144,39 +122,24 @@ fun AdminDashboardScreen(
                             Tab(
                                 selected = selectedRecentTab == index,
                                 onClick = { selectedRecentTab = index },
-                                text = { Text(title, fontSize = 12.sp) }
+                                text = { Text(title, fontSize = 14.sp) }
                             )
                         }
                     }
                     
-                    Spacer(Modifier.height(Dimens.paddingNormal))
+                    Spacer(modifier = Modifier.height(Dimens.paddingLarge))
                     
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(Dimens.radiusLarge))
-                            .background(Color.White.copy(alpha = 0.03f))
-                            .border(0.5.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(Dimens.radiusLarge))
-                            .padding(Dimens.paddingNormal)
-                    ) {
-                        AnimatedContent(targetState = selectedRecentTab, label = "recentTab") { tabIndex ->
-                            RecentContentList(
-                                tabIndex = tabIndex,
-                                recent = recent,
-                                onTrackClick = onTrackClick,
-                                onArtistClick = onArtistClick,
-                                onUserClick = onUserClick,
-                                onEditTrack = { track ->
-                                    editingTrack = track
-                                },
-                                onDeleteTrack = onDeleteTrack
-                            )
-                        }
-                    }
+                    RecentContentList(
+                        tabIndex = selectedRecentTab,
+                        recent = recent,
+                        onTrackClick = onTrackClick,
+                        onArtistClick = onArtistClick,
+                        onUserClick = onUserClick
+                    )
                 }
             }
 
-            // --- System Health ---
+            // --- Network Infrastructure ---
             item {
                 ContentSection(title = "Network Infrastructure") {
                     Column(verticalArrangement = Arrangement.spacedBy(Dimens.paddingNormal)) {
@@ -188,43 +151,6 @@ fun AdminDashboardScreen(
             }
         }
 
-        // --- DASHBOARD FAB ---
-        FloatingActionButton(
-            onClick = { showUploadDialog = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 24.dp, bottom = 100.dp),
-            containerColor = Primary,
-            contentColor = Color.Black
-        ) {
-            Icon(Icons.Default.Add, "Upload Track")
-        }
-
-        // --- UPLOAD DIALOG ---
-        if (showUploadDialog) {
-            TrackFormDialog(
-                onDismiss = { showUploadDialog = false },
-                onConfirm = { title, desc, artist, album, thumb, ytVid, source, ytUrl, file ->
-                    onUploadTrack(title, desc, artist, album, thumb, ytVid, source, ytUrl, file)
-                    showUploadDialog = false
-                }
-            )
-        }
-
-        // --- EDIT DIALOG ---
-        editingTrack?.let { track ->
-            TrackFormDialog(
-                initialTitle = track.title,
-                initialArtistId = track.artistId,
-                isEditMode = true,
-                onDismiss = { editingTrack = null },
-                onConfirm = { title, desc, artist, album, thumb, ytVid, _, _, _ ->
-                    onUpdateTrack(track.id, title, desc, artist, album, thumb, ytVid)
-                    editingTrack = null
-                }
-            )
-        }
-        
         if (isLoading && overview == null) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Primary)
@@ -330,10 +256,9 @@ private fun StatisticsPanorama(overview: StashOverview) {
 }
 
 @Composable
-fun TrackManagementItem(
+fun DashboardTrackItem(
     track: StashTrackItem,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -341,6 +266,7 @@ fun TrackManagementItem(
             .clip(RoundedCornerShape(Dimens.radiusMedium))
             .background(Color.White.copy(alpha = 0.03f))
             .border(0.5.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(Dimens.radiusMedium))
+            .clickable { onClick() }
             .padding(Dimens.paddingSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -355,14 +281,13 @@ fun TrackManagementItem(
             Text(track.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
             Text(track.artistName, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
         }
-        Row {
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.DeleteOutline, null, tint = Color.Red.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
-            }
-        }
+        
+        Icon(
+            Icons.Default.ChevronRight,
+            null,
+            tint = Color.White.copy(alpha = 0.2f),
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -460,9 +385,7 @@ fun RecentContentList(
     recent: StashRecent?,
     onTrackClick: (String) -> Unit,
     onArtistClick: (String) -> Unit,
-    onUserClick: (String) -> Unit,
-    onEditTrack: (StashTrackItem) -> Unit,
-    onDeleteTrack: (String) -> Unit
+    onUserClick: (String) -> Unit
 ) {
     if (recent == null) {
         Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
@@ -474,10 +397,9 @@ fun RecentContentList(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when (tabIndex) {
             0 -> recent.tracks.forEach { track ->
-                TrackManagementItem(
+                DashboardTrackItem(
                     track = track,
-                    onEdit = { onEditTrack(track) },
-                    onDelete = { onDeleteTrack(track.id) }
+                    onClick = { onTrackClick(track.id) }
                 )
             }
             1 -> recent.artists.forEach { artist ->

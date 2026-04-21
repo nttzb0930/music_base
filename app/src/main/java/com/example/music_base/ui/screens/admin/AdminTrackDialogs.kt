@@ -45,6 +45,7 @@ fun TrackFormDialog(
     initialThumbnailUrl: String = "",
     initialYoutubeVideoId: String = "",
     isEditMode: Boolean = false,
+    artists: List<com.example.music_base.data.model.Artist> = emptyList(),
     onDismiss: () -> Unit,
     onConfirm: (
         title: String,
@@ -70,6 +71,9 @@ fun TrackFormDialog(
     var youtubeUrl by remember { mutableStateOf("") }
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
+
+    var isArtistDropdownExpanded by remember { mutableStateOf(false) }
+    val selectedArtistName = artists.find { it.id == artistId }?.name ?: "Select artist..."
 
     val context = LocalContext.current
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -134,10 +138,65 @@ fun TrackFormDialog(
                     // description
                     AdminTextField(label = "Description (Optional)", value = description, onValueChange = { description = it }, placeholder = "Optional context...")
 
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.paddingNormal)) {
-                        AdminTextField(Modifier.weight(1f), label = "Artist UUID", value = artistId, onValueChange = { artistId = it })
-                        AdminTextField(Modifier.weight(1f), label = "Album UUID (Optional)", value = albumId, onValueChange = { albumId = it })
+                    // Artist ID Manual Input
+                    AdminTextField(
+                        label = "Artist ID (Manual Override)",
+                        value = artistId,
+                        onValueChange = { artistId = it },
+                        placeholder = "e.g. artist-123"
+                    )
+
+                    // Artist Selection Dropdown
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Column {
+                            Text("Artist (Selector Helper)", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.White.copy(alpha = 0.05f))
+                                    .border(1.dp, if (artistId.isEmpty()) Color.Transparent else Primary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                    .clickable { isArtistDropdownExpanded = true }
+                                    .padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Person, null, tint = Primary, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    text = selectedArtistName,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(Icons.Default.ArrowDropDown, null, tint = Color.White.copy(alpha = 0.5f))
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = isArtistDropdownExpanded,
+                            onDismissRequest = { isArtistDropdownExpanded = false },
+                            modifier = Modifier.fillMaxWidth(0.8f).background(Color(0xFF1E1E1E))
+                        ) {
+                            artists.forEach { artist ->
+                                DropdownMenuItem(
+                                    text = { 
+                                        Column {
+                                            Text(artist.name, color = Color.White)
+                                            Text(artist.id, color = Color.White.copy(alpha = 0.3f), fontSize = 10.sp)
+                                        }
+                                    },
+                                    onClick = {
+                                        artistId = artist.id
+                                        isArtistDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
                     }
+
+                    AdminTextField(label = "Album UUID (Optional)", value = albumId, onValueChange = { albumId = it })
 
                     AdminTextField(label = "Thumbnail URL (Optional)", value = thumbnailUrl, onValueChange = { thumbnailUrl = it })
                     AdminTextField(label = "Custom Video ID (Optional)", value = youtubeVideoId, onValueChange = { youtubeVideoId = it })
@@ -236,7 +295,8 @@ fun AdminTextField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String = ""
+    placeholder: String = "",
+    readOnly: Boolean = false
 ) {
     Column(modifier) {
         Text(label, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
@@ -245,14 +305,15 @@ fun AdminTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
+            readOnly = readOnly,
             placeholder = { Text(placeholder, color = Color.White.copy(alpha = 0.15f), fontSize = 14.sp) },
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.White.copy(alpha = 0.05f),
                 unfocusedContainerColor = Color.White.copy(alpha = 0.03f),
-                focusedIndicatorColor = Primary,
+                focusedIndicatorColor = if (readOnly) Color.Transparent else Primary,
                 unfocusedIndicatorColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
+                focusedTextColor = if (readOnly) Color.White.copy(alpha = 0.6f) else Color.White,
+                unfocusedTextColor = if (readOnly) Color.White.copy(alpha = 0.6f) else Color.White
             ),
             shape = RoundedCornerShape(8.dp),
             singleLine = true
@@ -287,4 +348,38 @@ private fun uriToFile(context: android.content.Context, uri: Uri): File {
     inputStream?.close()
     outputStream.close()
     return file
+}
+
+@Composable
+fun TrackDeleteConfirmDialog(
+    trackTitle: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1A1A1A),
+        icon = { Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(48.dp)) },
+        title = { Text("Confirm Deletion", color = Color.White) },
+        text = {
+            Text(
+                "Are you sure you want to remove '$trackTitle'?\n\nThis action will permanently delete the track from the core repository and all listener playlists.",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f))
+            ) {
+                Text("Delete Track", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Keep Track", color = Color.White.copy(alpha = 0.5f))
+            }
+        }
+    )
 }

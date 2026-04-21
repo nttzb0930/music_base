@@ -64,8 +64,8 @@ class MusicRepository(private val apiService: MusicApiService) {
     }
 
     // --- ARTISTS ---
-    suspend fun getArtists(page: Int = 1, limit: Int = 20): Result<PaginatedResponse<Artist>> {
-        return handleApi { apiService.getArtists(page, limit) }
+    suspend fun getArtists(page: Int = 1, limit: Int = 20, query: String? = null): Result<PaginatedResponse<Artist>> {
+        return handleApi { apiService.getArtists(page, limit, query) }
     }
 
     suspend fun getArtistDetail(id: String): Result<Artist> {
@@ -74,6 +74,44 @@ class MusicRepository(private val apiService: MusicApiService) {
 
     suspend fun getArtistTracks(id: String, page: Int = 1, limit: Int = 20): Result<PaginatedResponse<Track>> {
         return handleApi { apiService.getArtistTracks(id, page, limit) }
+    }
+
+    suspend fun createArtist(
+        name: String,
+        youtubeChannelId: String,
+        uploaderId: String? = null,
+        description: String? = null,
+        thumbnails: List<String>? = null
+    ): Result<Artist> {
+        return handleApi {
+            apiService.createArtist(
+                com.example.music_base.data.api.CreateArtistRequest(name, youtubeChannelId, uploaderId, description, thumbnails)
+            )
+        }
+    }
+
+    suspend fun updateArtist(
+        id: String,
+        name: String? = null,
+        youtubeChannelId: String? = null,
+        uploaderId: String? = null,
+        description: String? = null,
+        thumbnails: List<String>? = null
+    ): Result<Artist> {
+        return handleApi {
+            apiService.updateArtist(
+                id,
+                com.example.music_base.data.api.UpdateArtistRequest(name, youtubeChannelId, uploaderId, description, thumbnails)
+            )
+        }
+    }
+
+    suspend fun deleteArtist(id: String): Result<MessageResponse> {
+        return handleApi { apiService.deleteArtist(id) }
+    }
+
+    suspend fun syncArtist(youtubeChannelId: String): Result<MessageResponse> {
+        return handleApi { apiService.syncArtist(mapOf("youtubeChannelId" to youtubeChannelId)) }
     }
 
     // --- USERS / FOLLOWS ---

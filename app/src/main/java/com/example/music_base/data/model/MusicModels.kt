@@ -31,14 +31,17 @@ data class ArtistSummary(
 data class Track(
     val id: String,
     val title: String,
-    val youtubeVideoId: String,
-    val viewCount: Long,
-    val duration: Double, // API returns Double (e.g. 198.001)
-    val audioUrl: String?,
-    val bitrate: Int?,
+    val description: String? = null,
+    val youtubeVideoId: String? = null,
+    val viewCount: Long = 0,
+    val duration: Double = 0.0, // API returns Double (e.g. 198.001)
+    val audioUrl: String? = null,
+    val bitrate: Int? = null,
     val artistId: String,
-    val artist: Artist?,
-    val thumbnails: List<Thumbnail>?,
+    val artist: Artist? = null,
+    val albumId: String? = null,
+    val album: Album? = null,
+    val thumbnails: List<Thumbnail>? = null,
     val currentPosition: Long = 0L
 ) {
     val coverUrl: String

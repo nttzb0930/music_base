@@ -24,11 +24,13 @@ import androidx.compose.ui.text.style.TextAlign
 import coil.compose.AsyncImage
 import com.example.music_base.ui.viewmodel.AuthState
 import com.example.music_base.ui.viewmodel.AuthViewModel
+import com.example.music_base.ui.viewmodel.MusicViewModel
 
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit,
     viewModel: AuthViewModel,
+    musicViewModel: MusicViewModel,
     onNavigateToLogin: () -> Unit,
     onNavigateToRegister: () -> Unit,
     modifier: Modifier = Modifier
@@ -66,6 +68,7 @@ fun SettingsScreen(
 
             SettingsContent(
                 viewModel = viewModel,
+                musicViewModel = musicViewModel,
                 onNavigateToLogin = onNavigateToLogin,
                 onNavigateToRegister = onNavigateToRegister
             )
@@ -76,6 +79,7 @@ fun SettingsScreen(
 @Composable
 fun SettingsContent(
     viewModel: AuthViewModel,
+    musicViewModel: MusicViewModel,
     onNavigateToLogin: () -> Unit,
     onNavigateToRegister: () -> Unit,
     modifier: Modifier = Modifier
@@ -156,6 +160,31 @@ fun SettingsContent(
             }
         }
 
+        item {
+            SettingSection(title = "Feedback & Requests") {
+                var isExpanded by remember { mutableStateOf(false) }
+                
+                SettingItem(
+                    title = "Track Request Portal",
+                    icon = androidx.compose.material.icons.Icons.Rounded.Publish,
+                    onClick = { isExpanded = !isExpanded }
+                )
+                
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                ) {
+                    com.example.music_base.ui.components.PulseSyncCard(
+                        onSyncRequested = { 
+                            musicViewModel.syncTrackFromUrl(it)
+                            isExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+
         // Shared Sections
         item {
             SettingSection(title = "Audio Quality") {
@@ -183,6 +212,7 @@ fun SettingsContent(
                 SettingItem(title = "Privacy Policy", showExternalIcon = true)
             }
         }
+
 
         item {
             ExperimentalBentoCard()
