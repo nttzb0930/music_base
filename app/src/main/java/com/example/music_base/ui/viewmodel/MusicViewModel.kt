@@ -483,7 +483,7 @@ class MusicViewModel(
 
     // --- ARTIST MANAGEMENT ---
 
-    fun loadAdminArtists(isRefresh: Boolean = false, query: String? = null) {
+    fun loadAdminArtists(isRefresh: Boolean = false) {
         if (_isAdminArtistsLoading.value) return
         
         viewModelScope.launch {
@@ -494,7 +494,7 @@ class MusicViewModel(
 
             repository.getArtists(
                 page = _adminArtistsPage.value,
-                limit = 20
+                limit = 30 
             ).fold(
                 onSuccess = { response ->
                     if (isRefresh) {

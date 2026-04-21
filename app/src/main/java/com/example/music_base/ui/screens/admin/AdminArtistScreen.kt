@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -104,6 +105,13 @@ fun AdminArtistScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Filter by name or handle...", color = Color.White.copy(alpha = 0.4f)) },
                         leadingIcon = { Icon(Icons.Default.Search, null, tint = Primary) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Close, null, tint = Color.White.copy(alpha = 0.4f))
+                                }
+                            }
+                        },
                         colors = TextFieldDefaults.colors(
                             unfocusedContainerColor = Color.Transparent,
                             focusedContainerColor = Color.Transparent,
@@ -126,7 +134,11 @@ fun AdminArtistScreen(
                 }
             } else if (filteredArtists.isEmpty() && searchQuery.isNotBlank()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No local matches. Try searching globally.", color = Color.White.copy(alpha = 0.4f))
+                    Text("No local matches found", color = Color.White.copy(alpha = 0.4f))
+                }
+            } else if (artists.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Repository is empty", color = Color.White.copy(alpha = 0.4f))
                 }
             } else {
                 LazyColumn(

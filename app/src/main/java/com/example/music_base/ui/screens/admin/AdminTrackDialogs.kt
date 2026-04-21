@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,7 +46,6 @@ fun TrackFormDialog(
     initialThumbnailUrl: String = "",
     initialYoutubeVideoId: String = "",
     isEditMode: Boolean = false,
-    artists: List<com.example.music_base.data.model.Artist> = emptyList(),
     onDismiss: () -> Unit,
     onConfirm: (
         title: String,
@@ -71,9 +71,6 @@ fun TrackFormDialog(
     var youtubeUrl by remember { mutableStateOf("") }
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
-
-    var isArtistDropdownExpanded by remember { mutableStateOf(false) }
-    val selectedArtistName = artists.find { it.id == artistId }?.name ?: "Select artist..."
 
     val context = LocalContext.current
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -138,63 +135,13 @@ fun TrackFormDialog(
                     // description
                     AdminTextField(label = "Description (Optional)", value = description, onValueChange = { description = it }, placeholder = "Optional context...")
 
-                    // Artist ID Manual Input
+                    // Artist ID
                     AdminTextField(
-                        label = "Artist ID (Manual Override)",
+                        label = "Artist ID",
                         value = artistId,
                         onValueChange = { artistId = it },
                         placeholder = "e.g. artist-123"
                     )
-
-                    // Artist Selection Dropdown
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Column {
-                            Text("Artist (Selector Helper)", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                            Spacer(Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White.copy(alpha = 0.05f))
-                                    .border(1.dp, if (artistId.isEmpty()) Color.Transparent else Primary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                    .clickable { isArtistDropdownExpanded = true }
-                                    .padding(horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Person, null, tint = Primary, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(12.dp))
-                                Text(
-                                    text = selectedArtistName,
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Icon(Icons.Default.ArrowDropDown, null, tint = Color.White.copy(alpha = 0.5f))
-                            }
-                        }
-
-                        DropdownMenu(
-                            expanded = isArtistDropdownExpanded,
-                            onDismissRequest = { isArtistDropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.8f).background(Color(0xFF1E1E1E))
-                        ) {
-                            artists.forEach { artist ->
-                                DropdownMenuItem(
-                                    text = { 
-                                        Column {
-                                            Text(artist.name, color = Color.White)
-                                            Text(artist.id, color = Color.White.copy(alpha = 0.3f), fontSize = 10.sp)
-                                        }
-                                    },
-                                    onClick = {
-                                        artistId = artist.id
-                                        isArtistDropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
 
                     AdminTextField(label = "Album UUID (Optional)", value = albumId, onValueChange = { albumId = it })
 

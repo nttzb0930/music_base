@@ -383,10 +383,8 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                             }
                             AdminBottomNavItem.Ingest -> {
                                 val isAdminOperationLoading by musicViewModel.isAdminOperationLoading.collectAsState()
-                                val artists by musicViewModel.adminArtists.collectAsState()
                                 AdminIngestScreen(
                                     isAdminLoading = isAdminOperationLoading,
-                                    artists = artists,
                                     onUploadTrack = { title: String, desc: String?, art: String, alb: String?, thumb: String?, ytVid: String?, type: String, ytUrl: String?, file: okhttp3.MultipartBody.Part? ->
                                         musicViewModel.uploadTrack(title, desc, art, alb, thumb, ytVid, type, ytUrl, file)
                                     }
@@ -459,7 +457,6 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                     }
 
                     editingTrack?.let { track ->
-                        val artists by musicViewModel.adminArtists.collectAsState()
                         TrackFormDialog(
                             initialTitle = track.title,
                             initialDescription = track.description ?: "",
@@ -468,7 +465,6 @@ fun MainAppScaffold(authViewModel: AuthViewModel, musicViewModel: MusicViewModel
                             initialThumbnailUrl = track.coverUrl,
                             initialYoutubeVideoId = track.youtubeVideoId ?: "",
                             isEditMode = true,
-                            artists = artists,
                             onDismiss = { editingTrack = null },
                             onConfirm = { title, desc, artist, album, thumb, ytVid, _, _, _ ->
                                 musicViewModel.updateTrack(track.id, title, desc, artist, album, thumb, ytVid)
